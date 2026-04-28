@@ -1,0 +1,113 @@
+package com.huntergame.BE;
+
+import com.huntergame.HunterGame;
+import com.huntergame.HunterTracker;
+import com.xigua.baseAPI.BaseAPI;
+import com.xigua.cumulus.form.SimpleForm;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class BedrockTrackingGUI {
+
+    public static void openBedrockTrackingMenu(HunterGame plugin, HunterTracker tracker, Player player) {
+        BaseAPI baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
+        if (baseAPI == null) {
+            return;
+        }
+        SimpleForm.Builder builder = SimpleForm.builder()
+                .title("猎人追踪器")
+                .content("请选择操作：")
+                .button("§a传送到队友\n§7消耗生命值快速支援")
+                .button("§e切换指南针目标\n§7追踪最近逃生者/队友")
+                .button("§c关闭菜单");
+
+        builder.validResultHandler(response -> {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    switch (response.clickedButtonId()) {
+                        case 0: // 传送
+                            if (tracker.isEscaperNearby(player, tracker.DETECTION_DISTANCE)) {
+                                player.sendMessage(plugin.getMessage("nearby_escape", "&c附近有逃生者，无法传送！"));
+                                return;
+                            }
+                            openBedrockTeammateList(plugin, tracker, player);
+                            break;
+                        case 1: // 切换追踪
+                            tracker.switchToHunterTrackingTarget(player);
+                            break;
+                        case 2: // 关闭
+                            break;
+                    }
+                }
+            }.runTask(plugin);
+        });
+        baseAPI.sendForm(player.getUniqueId(), builder);
+    }
+
+    // 基岩版：队友列表
+    public static void openBedrockTeammateList(HunterGame plugin, HunterTracker tracker, Player player) {
+        BaseAPI spigotMaster = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
+        if (spigotMaster == null) {
+            return;
+        }
+
+        List<Player> teammates = plugin.getHunters();
+        teammates.remove(player);
+
+        if (teammates.isEmpty()) {
+            player.sendMessage("§c没有可传送的队友！");
+            return;
+        }
+
+        SimpleForm.Builder builder = SimpleForm.builder()
+                .title("选择传送目标")
+                .content("点击队友头像进行传送（消耗 " + tracker.DEDUCT_HEALTH + " 血量）：");
+
+        // 存储队友列表顺序，以便回调时对应
+        List<Player> validTeammates = new ArrayList<>();
+
+        for (Player teammate : teammates) {
+            if (teammate != null && teammate.isOnline() && plugin.isHunter(teammate.getUniqueId())) {
+                builder.button("§e" + teammate.getName() + "\n§7点击传送");
+                validTeammates.add(teammate);
+            }
+        }
+
+        builder.button("§c取消");
+
+        builder.validResultHandler(response -> {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    int id = response.clickedButtonId();
+
+                    // 检查是否点了取消 (ID 等于列表长度时为最后一个按钮)
+                    if (id >= validTeammates.size()) return;
+
+                    Player target = validTeammates.get(id);
+
+                    // 执行传送逻辑
+                    if (tracker.isOnCooldown(player)) {
+                        long timeLeft = tracker.getCooldownTimeLeft(player);
+                        player.sendMessage(plugin.getMessage("waiting_countdown_teleport", "&c冷却中: " + timeLeft + "s"));
+                        return;
+                    }
+
+                    if (target != null && target.isOnline()) {
+                        // 调用 Tracker 的公共传送方法，统一逻辑
+                        tracker.performTeleport(player, target);
+                    } else {
+                        player.sendMessage(plugin.getMessage("Teammate_unavailable", "&c目标不可用"));
+                    }
+                }
+            }.runTask(plugin);
+        });
+
+        spigotMaster.sendForm(player.getUniqueId(), builder);
+    }
+}

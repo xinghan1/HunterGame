@@ -1,0 +1,57 @@
+# 全局配置
+global:
+  enable: true                     # 是否启用增益效果
+  enhancement-interval: 360        # 全局效果任务执行间隔（秒）
+  default-effect-duration: 120     # 普通药水效果默认持续时间（秒）
+  special-effect-duration: 60      # 特殊效果默认持续时间（秒） 如超级挖矿，爆破采矿
+
+# 药水效果配置（可自定义添加）
+potion-effects:
+  speed_2:
+    type: SPEED   # 药水效果
+    amplifier: 1    # 药水等级
+    duration: 120    # 药水持续时间
+    message: "&a你获得了速度 II 效果！"
+  jump_2:
+    type: JUMP_BOOST
+    amplifier: 1
+    duration: 120
+    message: "&a你获得了跳跃提升 II 效果！"
+  fire_resist:
+    type: FIRE_RESISTANCE
+    amplifier: 0
+    duration: 60
+    message: "&a你获得了抗火效果！"
+  regen_2:
+    type: REGENERATION
+    amplifier: 1
+    duration: 120
+    message: "&a你获得了生命恢复 II 效果！"
+  resistance_2:
+    type: RESISTANCE
+    amplifier: 1
+    duration: 120
+    message: "&a你获得了抗性提升 II 效果！"
+#  all_effects:
+#    type: COMBINATION
+#    combine: [speed_2, jump_2, regen_2, resistance_2]
+#    message: "&a你获得了所有效果！"
+
+# 特殊效果配置（不可自定义添加）
+special-effects:
+  explosion_mining:
+    message: "&a你获得了爆破采矿能力！持续 {duration} 秒！"
+    end-message: "&c爆破采矿效果结束！"
+    radius: 1  # 爆破采矿半径
+    smelt-ores: true  # 是否熔炼矿物
+  auto_mining:
+    message: "&a你获得了超级挖矿能力！持续 {duration} 秒！"
+    end-message: "&c超级挖矿效果结束！"
+    max-distance: 5
+    skip-unbreakable: true
+
+# 矿石熔炼映射
+ore-smelt-mapping:
+  IRON_ORE: IRON_INGOT
+  GOLD_ORE: GOLD_INGOT
+  COPPER_ORE: COPPER_INGOT

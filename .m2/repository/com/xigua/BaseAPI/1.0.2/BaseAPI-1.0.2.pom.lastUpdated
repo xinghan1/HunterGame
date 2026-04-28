@@ -1,0 +1,10 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Mon Apr 27 17:08:12 HKT 2026
+https\://oss.sonatype.org/content/groups/public/.error=
+https\://oss.sonatype.org/content/groups/public/.lastUpdated=1777279896991
+https\://repo.extendedclip.com/content/repositories/placeholderapi/.error=
+https\://repo.extendedclip.com/content/repositories/placeholderapi/.lastUpdated=1777279893544
+https\://repo.maven.apache.org/maven2/.error=
+https\://repo.maven.apache.org/maven2/.lastUpdated=1777280892046
+https\://repo.papermc.io/repository/maven-public/.error=
+https\://repo.papermc.io/repository/maven-public/.lastUpdated=1777279894862

@@ -1,0 +1,10 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Mon Apr 27 17:08:15 HKT 2026
+@default-sonatype-https\://oss.sonatype.org/content/groups/public/.lastUpdated=1777280895549
+https\://oss.sonatype.org/content/groups/public/.error=Could not transfer artifact com.xigua\:BaseAPI\:jar\:1.0.2 from/to sonatype (https\://oss.sonatype.org/content/groups/public/)\: \u4E0D\u77E5\u9053\u8FD9\u6837\u7684\u4E3B\u673A\u3002 (repo1.maven.org)
+https\://repo.extendedclip.com/content/repositories/placeholderapi/.error=
+https\://repo.extendedclip.com/content/repositories/placeholderapi/.lastUpdated=1777280893850
+https\://repo.maven.apache.org/maven2/.error=
+https\://repo.maven.apache.org/maven2/.lastUpdated=1777280895778
+https\://repo.papermc.io/repository/maven-public/.error=
+https\://repo.papermc.io/repository/maven-public/.lastUpdated=1777280895001

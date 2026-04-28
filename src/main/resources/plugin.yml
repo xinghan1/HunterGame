@@ -1,0 +1,40 @@
+name: HunterGame
+version: '${project.version}'
+main: com.huntergame.HunterGame
+api-version: '1.20'
+author: YourName
+description: A Minecraft Hunter Game plugin.
+depend:
+  - PlaceholderAPI
+softdepend:
+  - BaseAPI
+commands:
+  huntergame:
+    description: "HunterGame 插件指令"
+    permission: "huntergame.reload"  # 设定一个默认的权限（可根据需要修改）
+    usage: ""
+  hg:
+    description: "HunterGame 缩写指令"
+    permission: "huntergame.reload"
+    usage: ""
+    subcommands:
+      setlobby:
+        description: "Set the lobby location."
+        permission: "huntergame.setlobby"  # 可选：为子命令设置权限
+      startgame:
+        description: "Start the Hunter Game."
+        permission: "huntergame.startgame"  # 可选：为子命令设置权限
+      reload:
+        description: "Reload the HunterGame plugin."
+        usage: "/huntergame reload"
+        permission: "huntergame.reload"
+      help:
+        description: "Reload the HunterGame plugin."
+        usage: "/huntergame help"
+        permission: "huntergame.help"
+
+
+permissions:
+  huntergame.reload:
+    description: "允许玩家重载 HunterGame 配置"
+    default: op

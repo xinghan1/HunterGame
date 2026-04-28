@@ -1,0 +1,297 @@
+package com.huntergame.papi;
+
+import com.huntergame.HunterGame;
+import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import org.bukkit.*;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.jetbrains.annotations.NotNull;
+
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+
+public class HunterGamePlaceholder extends PlaceholderExpansion implements Listener {
+
+    private final HunterGame plugin;
+    private static Location bastionLocation = null;
+    private static Location fortressLocation = null;
+    private final Map<UUID, Integer> tierCache = new ConcurrentHashMap<>();
+    private boolean bastionSearchRunning = false;
+    private boolean fortressSearchRunning = false;
+
+    public HunterGamePlaceholder(HunterGame plugin) {
+        this.plugin = plugin;
+        scheduleWeeklyTierRefresh();
+    }
+
+    /**
+     * 每周一凌晨4点刷新全服排名
+     */
+    private void scheduleWeeklyTierRefresh() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nextMonday4am = now.with(TemporalAdjusters.next(DayOfWeek.MONDAY)).withHour(4).withMinute(0).withSecond(0).withNano(0);
+        // 如果当前就是周一且还没到4点，用本周一
+        if (now.getDayOfWeek() == DayOfWeek.MONDAY && now.getHour() < 4) {
+            nextMonday4am = now.withHour(4).withMinute(0).withSecond(0).withNano(0);
+        }
+
+        long delaySeconds = Duration.between(now, nextMonday4am).getSeconds();
+        long delayTicks = delaySeconds * 20L;
+        long oneWeekTicks = 7L * 24 * 60 * 60 * 20; // 一周的tick数
+
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::refreshAllTiers, delayTicks, oneWeekTicks);
+    }
+
+    /**
+     * 批量刷新所有玩家的排名缓存
+     */
+    public void refreshAllTiers() {
+        Map<UUID, Integer> allTiers = plugin.getDataStorageManager().getAllPlayerTiers();
+        tierCache.clear();
+        tierCache.putAll(allTiers);
+        plugin.getLogger().info("猎人游戏全服排名已刷新。");
+    }
+
+    @Override
+    public @NotNull String getIdentifier() {
+        return "huntergame";
+    }
+
+    @Override
+    public @NotNull String getAuthor() {
+        return "你的名字";
+    }
+
+    @Override
+    public @NotNull String getVersion() {
+        return "1.0";
+    }
+
+    @Override
+    public boolean persist() {
+        return true;
+    }
+
+    @Override
+    public boolean canRegister() {
+        return true;
+    }
+
+    @Override
+    public String onPlaceholderRequest(Player player, @NotNull String params) {
+        if (player == null) {
+            return null;
+        }
+        UUID playerId = player.getUniqueId();
+
+        // 角色
+        if (params.equalsIgnoreCase("role")) {
+            if (plugin.isHunter(playerId)) {
+                return ChatColor.RED + "猎人";
+            } else if (plugin.isEscaper(playerId)) {
+                return ChatColor.AQUA + "逃生者";
+            } else if (plugin.isDeathescapers(playerId)) {
+                return ChatColor.AQUA + "逃生者 死亡";
+            } else {
+                return ChatColor.GRAY + "未分配";
+            }
+        }
+
+        // 新增：模式显示占位符
+        if (params.equalsIgnoreCase("mode")) {
+            if (plugin.getConfig().getBoolean("mode-selection.toggle.fixed-mode-enabled", false)) {
+                int fixedModeId = plugin.getConfig().getInt("mode-selection.toggle.fixed-mode-id", 1);
+                String fixedModeName = ChatColor.GRAY + "未知模式";
+
+                // 根据模式ID匹配对应名称（与默认配置中的模式名称一致）
+                switch (fixedModeId) {
+                    case 1:
+                        fixedModeName = ChatColor.YELLOW + "技能之战";
+                        break;
+                    case 2:
+                        fixedModeName = ChatColor.RED + "终章";
+                        break;
+                    case 3:
+                        fixedModeName = ChatColor.GREEN + "原版猎人";
+                        break;
+                }
+                return fixedModeName;
+            }
+
+            // 判断当前模式并返回对应文本
+            if (plugin.isFinalBattleMode()) {
+                return ChatColor.RED + "终章";
+            } else if (plugin.isVanillaHunterMode()){
+                return ChatColor.GREEN + "原版猎人";
+            } else if (plugin.isSkillHunterMode()) {
+                return ChatColor.YELLOW + "技能之战";
+            } else {
+                return ChatColor.GRAY + "未开始";
+            }
+        }
+
+        // 猎人数量
+        if (params.equalsIgnoreCase("hunter_count")) {
+            return String.valueOf(plugin.getHunters().size());
+        }
+
+        // 逃生者数量
+        if (params.equalsIgnoreCase("escaper_count")) {
+            return String.valueOf(plugin.getEscapers().size());
+        }
+
+        // 击杀数量
+        if (params.equalsIgnoreCase("kills")) {
+            return String.valueOf(plugin.getDataStorageManager().getKills(player.getUniqueId()));
+        }
+
+        // 总击杀数量
+        if (params.equalsIgnoreCase("kills_put")) {
+            return String.valueOf(plugin.getDataStorageManager().getKillsput(player.getUniqueId()));
+        }
+
+        // 死亡次数
+        if (params.equalsIgnoreCase("deaths")) {
+            return String.valueOf(plugin.getDataStorageManager().getDeaths(player.getUniqueId()));
+        }
+
+        // 游戏次数
+        if (params.equalsIgnoreCase("games_played")) {
+            return String.valueOf(plugin.getDataStorageManager().getGamesPlayed(player.getUniqueId()));
+        }
+
+        // 猎人胜利次数
+        if (params.equalsIgnoreCase("hunter_wins")) {
+            return String.valueOf(plugin.getDataStorageManager().getHunterWin(player.getUniqueId()));
+        }
+
+        // 逃生者胜利次数
+        if (params.equalsIgnoreCase("escape_wins")) {
+            return String.valueOf(plugin.getDataStorageManager().getEscapeWin(player.getUniqueId()));
+        }
+
+        // 总胜利次数
+        if (params.equalsIgnoreCase("total_wins")) {
+            return String.valueOf(plugin.getDataStorageManager().getTotalWins(player.getUniqueId()));
+        }
+
+        // 游戏时间
+        if (params.equalsIgnoreCase("gametime")) {
+            return plugin.getFormattedGameTime();
+        }
+
+        // 熟练度
+        if (params.equalsIgnoreCase("proficiency")) {
+            return String.valueOf(plugin.getDataStorageManager().getProficiency(player));
+        }
+
+        // 段位等级
+        if (params.equalsIgnoreCase("rank")) {
+            double proficiency = plugin.getDataStorageManager().getProficiency(player);
+            return plugin.getRankManager().getRankName(proficiency);
+        }
+
+        if (params.equalsIgnoreCase("fortress")) {
+            return fortressLocation != null ? formatLocation(fortressLocation) : "未找到";
+        }
+
+        if (params.equalsIgnoreCase("bastion")) {
+            return bastionLocation != null ? formatLocation(bastionLocation) : "未找到";
+        }
+
+        if (params.equalsIgnoreCase("portal")) {
+            return plugin.getPortalCoordinatesPlaceholder(player);
+        }
+
+        // 赛季id
+        if (params.equalsIgnoreCase("season")) {
+            return String.valueOf(plugin.getSeasonManager().getCurrentSeasonId());
+        }
+
+        // 全服熟练度排名
+        if (params.equalsIgnoreCase("tier")) {
+            Integer tier = tierCache.get(player.getUniqueId());
+            return tier != null ? String.valueOf(tier) : "暂无数据";
+        }
+
+        return null;
+    }
+
+
+
+    @EventHandler
+    public void onPlayerEnterNether(PlayerPortalEvent event) {
+        Player player = event.getPlayer();
+        World nether = Bukkit.getWorld("world_nether");
+
+        if (event.getTo() != null && nether != null && event.getTo().getWorld().equals(nether)) {
+            startFortressSearchTask(player, nether);
+            startBastionSearchTask(player, nether);
+        }
+    }
+
+    private void startBastionSearchTask(Player player, World nether) {
+        if (bastionLocation != null || bastionSearchRunning) {
+            return;
+        }
+        bastionSearchRunning = true;
+        new BukkitRunnable() {
+            private int attempts = 0;
+
+            @Override
+            public void run() {
+                if (bastionLocation != null || attempts++ >= 12) {
+                    bastionSearchRunning = false;
+                    cancel();
+                    return;
+                }
+
+                Location bastion = nether.locateNearestStructure(player.getLocation(), StructureType.BASTION_REMNANT, 200, false);
+                if (bastion != null) {
+                    bastionLocation = bastion;
+                    bastionSearchRunning = false;
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0, 20L * 15);
+    }
+
+    private void startFortressSearchTask(Player player, World nether) {
+        if (fortressLocation != null || fortressSearchRunning) {
+            return;
+        }
+        fortressSearchRunning = true;
+        new BukkitRunnable() {
+            private int attempts = 0;
+
+            @Override
+            public void run() {
+                if (fortressLocation != null || attempts++ >= 12) {
+                    fortressSearchRunning = false;
+                    cancel();
+                    return;
+                }
+
+                Location fortress = nether.locateNearestStructure(player.getLocation(), StructureType.NETHER_FORTRESS, 200, false);
+                if (fortress != null) {
+                    fortressLocation = fortress;
+                    fortressSearchRunning = false;
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0, 20L * 15);
+    }
+
+    static String formatLocation(Location location) {
+        return String.format("%d,%d,%d", location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+}

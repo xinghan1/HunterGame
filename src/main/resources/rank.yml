@@ -1,0 +1,86 @@
+# 段位配置
+ranks:
+  0:
+    name: 新手上路
+    min: 0.0
+    max: 30.0
+  1:
+    name: 勇者之路
+    min: 30.0
+    max: 80.0
+  2:
+    name: 超级精英
+    min: 80.0
+    max: 100.0
+  3:
+    name: 超凡大师
+    min: 100.0
+    max: 130.0
+  4:
+    name: 傲世宗师
+    min: 130.0
+    max: 160.0
+  5:
+    name: 猎人战神
+    min: 200.0
+    max: 999999.0
+
+# 赛季配置指令奖励
+season-rewards:
+  新手上路:
+    - "points give %player% 1000"
+    - "money give %player% 2000"
+    - "clv addexp 200 %player%"
+  勇者之路:
+    - "points give %player% 2500"
+    - "money give %player% 3000"
+    - "clv addexp 400 %player%"
+  超级精英:
+    - "points give %player% 5000"
+    - "money give %player% 7000"
+    - "clv addexp 500 %player%"
+  超凡大师:
+    - "points give %player% 8000"
+    - "money give %player% 10000"
+    - "clv addexp 800 %player%"
+  傲世宗师:
+    - "points give %player% 10000"
+    - "money give %player% 20000"
+    - "clv addexp 1000 %player%"
+  猎人战神:
+    - "points give %player% 12000"
+    - "money give %player% 30000"
+    - "clv addexp 1500 %player%"
+
+
+# 熟练度奖励配置
+proficiency-rewards:
+  GameStartReward: 0.3  # 游戏开始奖励
+  # 终章之战 奖励配置
+  FinalBattle_EscaperKillReward: 0.5  # 逃生者击杀
+  FinalBattle_HunterKillReward: 3   # 猎人击杀
+  FinalBattle_EscaperDeathReward: -1.5  # 逃生者死亡扣除
+  FinalBattle_HunterDeathReward: -0.3  # 猎人死亡扣除
+  FinalBattle_EscaperWinReward: 3  # 逃生者胜利
+  FinalBattle_EscaperFailReward: -1  # 逃生者失败
+  FinalBattle_HunterWinReward: 1.5 # 猎人胜利
+  FinalBattle_HunterFailReward: -1  # 猎人失败
+  # 技能之战 奖励配置
+  SkillBattle_EscaperKillReward: 0.3  # 逃生者击杀
+  SkillBattle_HunterKillReward: 1.5   # 猎人击杀
+  SkillBattle_EscaperDeathReward: -1.5  # 逃生者死亡扣除
+  SkillBattle_HunterDeathReward: -0.4  # 猎人死亡扣除
+  SkillBattle_EscaperWinReward: 7  # 逃生者胜利
+  SkillBattle_EscaperFailReward: -2  # 逃生者失败
+  SkillBattle_HunterWinReward: 2  # 猎人胜利
+  SkillBattle_HunterFailReward: -1.5  # 猎人失败
+  # 原版猎人 奖励配置
+  OrdinaryBattle_EscaperKillReward: 0.4  # 逃生者击杀
+  OrdinaryBattle_HunterKillReward: 1.5   # 猎人击杀
+  OrdinaryBattle_EscaperDeathReward: -1  # 逃生者死亡扣除
+  OrdinaryBattle_HunterDeathReward: -0.4  # 猎人死亡扣除
+  OrdinaryBattle_EscaperWinReward: 8  # 逃生者胜利
+  OrdinaryBattle_EscaperFailReward: -2  # 逃生者失败
+  OrdinaryBattle_HunterWinReward: 1.5  # 猎人胜利
+  OrdinaryBattle_HunterFailReward: -1.5  # 猎人失败
+

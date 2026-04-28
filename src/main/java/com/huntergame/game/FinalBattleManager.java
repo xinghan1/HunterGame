@@ -1,0 +1,589 @@
+package com.huntergame.game;
+
+import com.huntergame.HunterGame;
+import com.huntergame.RoleSelectionHandler;
+import org.bukkit.*;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.block.Block;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class FinalBattleManager implements Listener {
+    private final HunterGame plugin;
+    private final Map<UUID, Integer> playerVotes;
+
+    private final List<Player> finalBattleEscapers = new ArrayList<>();
+    private final List<Player> hunters = new ArrayList<>();
+
+    private boolean gameActive = false;
+    private boolean dragonHealthModified = false;
+    private final Map<UUID, Set<Location>> playerCages = new HashMap<>();
+    private final Map<UUID, Integer> taskIds = new HashMap<>();
+    private final Set<Location> barrierBlocks = new HashSet<>();
+    private final Map<UUID, Integer> titleTaskIds = new HashMap<>();
+
+    public FinalBattleManager(HunterGame plugin, Map<UUID, Integer> votes) {
+        this.plugin = plugin;
+        this.playerVotes = votes;
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    public void startFinalBattle() {
+        // 初始化游戏状态
+        gameActive = true;
+        plugin.setGameInProgress(true);
+        plugin.startGame();
+
+        // 角色分配
+        assignRoles();
+
+        // 世界准备
+        World endWorld = getOrCreateEndWorld();
+        if (endWorld == null) {
+            Bukkit.broadcastMessage(ChatColor.RED + "末地世界加载失败！");
+            return;
+        }
+        // 传送玩家
+        teleportPlayers(endWorld);
+        // 发放装备
+        giveConfiguredEquipment();
+        createCagesForAllPlayers();
+        // 检查是否已有末影龙
+        checkAndModifyExistingDragon(endWorld);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Bukkit.broadcastMessage(ChatColor.GREEN + "===== 终章之战 已启动 =====");
+
+            if (plugin.isPersistenceBattle()) {
+                int minutes = plugin.getConfig().getInt("game.persistence_modes.final_battle_minutes", 15);
+                Bukkit.broadcastMessage(ChatColor.YELLOW + "【持久战模式】");
+                Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：存活 " + minutes + " 分钟 •");
+                Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：阻止逃生者，歼灭战 •");
+            } else {
+                Bukkit.broadcastMessage(ChatColor.RED + "【通关战模式】");
+                Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：击杀末影龙 •");
+                Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：阻止逃生者，歼灭战 •");
+            }
+
+
+            Bukkit.broadcastMessage(ChatColor.GRAY + "• 阵营： " + finalBattleEscapers.size() + "名逃生者 vs " + hunters.size() + "名猎人 •");
+
+            for (Player hunter : plugin.getHunters()) {
+                hunter.sendMessage(plugin.getMessage("hunter_identity", "&a你是 &c猎人！"));
+            }
+            for (Player escaper : plugin.getEscapers()) {
+                escaper.sendMessage(plugin.getMessage("escaper_identity", "&a你是 &b逃生者！"));
+            }
+        }, 30L);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.setGameMode(GameMode.SURVIVAL);
+            plugin.getDataStorageManager().addGamePlayed(player.getUniqueId(), player);
+        }
+    }
+
+    /**
+     * 检查并修改现有末影龙的生命值
+     */
+    private void checkAndModifyExistingDragon(World world) {
+        // 遍历世界中的所有实体，查找末影龙
+        for (Entity entity : world.getEntities()) {
+            if (entity instanceof EnderDragon) {
+                modifyDragonHealth((EnderDragon) entity);
+                break;
+            }
+        }
+    }
+
+    /**
+     * 修改末影龙的生命值
+     */
+    private void modifyDragonHealth(EnderDragon dragon) {
+        // 设置最大生命值）
+        AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (maxHealthAttribute != null) {
+            maxHealthAttribute.setBaseValue(400.0); // 设置最大生命值为400
+
+            if (plugin.isPersistenceBattle() && plugin.isFinalBattleMode()) {
+                dragon.setHealth(100.0); // 设置当前生命值为100
+            } else {
+                dragon.setHealth(400.0); // 设置当前生命值为400
+            }
+            dragonHealthModified = true;
+
+            dragon.getWorld().strikeLightningEffect(dragon.getLocation());
+            Bukkit.broadcastMessage(ChatColor.RED + "末影龙已觉醒！生命值: 400");
+        }
+    }
+
+    /**
+     * 监听末影龙生成事件
+     */
+    @EventHandler
+    public void onDragonSpawn(CreatureSpawnEvent event) {
+        if (event.getEntity() instanceof EnderDragon && !dragonHealthModified) {
+            EnderDragon dragon = (EnderDragon) event.getEntity();
+            modifyDragonHealth(dragon);
+        }
+    }
+
+    // ===== 新增：为所有玩家创建屏障 =====
+    private void createCagesForAllPlayers() {
+        List<Player> allPlayers = new ArrayList<>(hunters);
+        allPlayers.addAll(finalBattleEscapers); // 添加所有逃生者
+
+        for (Player player : allPlayers) {
+            createCage(player);
+        }
+    }
+
+    // 创建玩家屏障
+    public void createCage(Player player) {
+        UUID playerId = player.getUniqueId();
+        Location center = player.getLocation().clone();
+        center = center.getBlock().getLocation().add(0, 1, 0); // 调整中心高度
+
+        Set<Location> cageBlocks = new HashSet<>();
+        int radius = 2; // 5x5x5立方体
+
+        // 生成5x5x5空心立方体
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -1; y <= 3; y++) { // 高度从脚下-1到头顶+3
+                for (int z = -radius; z <= radius; z++) {
+                    boolean isSurface =
+                            Math.abs(x) == radius ||
+                                    Math.abs(z) == radius ||
+                                    y == -1 || y == 3;
+
+                    Location loc = center.clone().add(x, y, z);
+                    Block block = loc.getBlock();
+
+                    if (isSurface) {
+                        block.setType(Material.BARRIER);
+                        cageBlocks.add(loc);
+                        barrierBlocks.add(loc);
+                    } else {
+                        block.setType(Material.AIR);
+                    }
+                }
+            }
+        }
+
+        playerCages.put(player.getUniqueId(), cageBlocks);
+
+        // 根据阵营设置不同消失时间（逃生者20秒，猎人25秒）
+        int totalSeconds = plugin.isEscaper(playerId) ? 20 : 25;
+        int delayTicks = totalSeconds * 20;
+
+        //显示标题和倒计时
+        startTitleCountdown(player, totalSeconds);
+
+        int taskId = new BukkitRunnable() {
+            @Override
+            public void run() {
+                removeCage(player);
+                taskIds.remove(player.getUniqueId());
+
+                cancelTitleTask(playerId);
+                player.sendTitle(
+                        ChatColor.GREEN + "游戏已开始！",
+                        ChatColor.WHITE + "",
+                        10, 40, 10
+                );
+            }
+        }.runTaskLater(plugin, delayTicks).getTaskId();
+
+        taskIds.put(player.getUniqueId(), taskId);
+    }
+
+    /**
+     * 取消玩家的标题倒计时任务
+     */
+    private void cancelTitleTask(UUID playerId) {
+        if (titleTaskIds.containsKey(playerId)) {
+            Bukkit.getScheduler().cancelTask(titleTaskIds.get(playerId));
+            titleTaskIds.remove(playerId);
+        }
+    }
+    /**
+     * 为单个玩家启动标题倒计时
+     */
+    private void startTitleCountdown(Player player, int totalSeconds) {
+        UUID playerId = player.getUniqueId();
+
+        // 立即显示初始标题
+        player.sendTitle(
+                ChatColor.YELLOW + "请注意当前环境是否安全",
+                ChatColor.RED + "准备开始：" + totalSeconds + "秒",
+                0, 20, 0
+        );
+
+        // 启动倒计时任务
+        int titleTaskId = new BukkitRunnable() {
+            int remaining = totalSeconds - 1;
+
+            @Override
+            public void run() {
+                if (remaining <= 0) {
+                    this.cancel();
+                    return;
+                }
+
+                player.sendTitle(
+                        ChatColor.YELLOW + "请注意当前环境是否安全", // 主标题固定
+                        ChatColor.RED + "准备开始：" + remaining + "秒",
+                        0, 20, 0 // 每次显示1秒
+                );
+                remaining--;
+            }
+        }.runTaskTimer(plugin, 20L, 20L).getTaskId(); // 延迟1秒（20 ticks）后开始，每秒执行
+
+        titleTaskIds.put(playerId, titleTaskId);
+    }
+
+    // 移除玩家屏障
+    private void removeCage(Player player) {
+        UUID playerId = player.getUniqueId();
+        if (playerCages.containsKey(playerId)) {
+            // 移除屏障方块
+            for (Location loc : playerCages.get(playerId)) {
+                Block block = loc.getBlock();
+                if (block.getType() == Material.BARRIER) {
+                    block.setType(Material.AIR);
+                }
+            }
+            playerCages.remove(playerId);
+        }
+    }
+
+    private void assignRoles() {
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        finalBattleEscapers.clear();
+        hunters.clear();
+
+        // 1. 动态获取需要多少名逃生者
+        int playerCount = players.size();
+        int targetEscaperCount = getTargetEscaperCount(playerCount);
+
+        // 2. 从投票逃生者中选择
+        List<Player> escaperCandidates = players.stream()
+                .filter(p -> playerVotes.getOrDefault(p.getUniqueId(), 0) == 1)
+                .collect(Collectors.toList());
+
+        Collections.shuffle(escaperCandidates); // 打乱候选人
+
+        // 3. 填充逃生者列表
+        // 先从投票者中选
+        while (finalBattleEscapers.size() < targetEscaperCount && !escaperCandidates.isEmpty()) {
+            finalBattleEscapers.add(escaperCandidates.remove(0));
+        }
+
+        // 如果还不够，从剩余玩家中随机选（排除已选的）
+        if (finalBattleEscapers.size() < targetEscaperCount) {
+            List<Player> remainingPlayers = new ArrayList<>(players);
+            remainingPlayers.removeAll(finalBattleEscapers);
+            Collections.shuffle(remainingPlayers);
+
+            while (finalBattleEscapers.size() < targetEscaperCount && !remainingPlayers.isEmpty()) {
+                finalBattleEscapers.add(remainingPlayers.remove(0));
+            }
+        }
+
+        // 4. 其余玩家分配为猎人
+        for (Player p : players) {
+            if (!finalBattleEscapers.contains(p)) {
+                hunters.add(p);
+                plugin.addHunter(p.getUniqueId());
+                p.getPersistentDataContainer().set(RoleSelectionHandler.IS_HUNTER, PersistentDataType.BOOLEAN, true);
+            }
+        }
+
+        // 5. 初始化逃生者状态
+        for (Player esc : finalBattleEscapers) {
+            plugin.addEscaper(esc.getUniqueId());
+            esc.getPersistentDataContainer().set(RoleSelectionHandler.IS_ESCAPER, PersistentDataType.BOOLEAN, true);
+            applyGlowingEffect(esc);
+        }
+    }
+
+    private int getTargetEscaperCount(int totalPlayers) {
+        int count = plugin.getConfig().getInt("player_counts.final_battle.scaling.default", 1);
+
+        ConfigurationSection thresholds = plugin.getConfig().getConfigurationSection("player_counts.final_battle.scaling.thresholds");
+
+        if (thresholds != null) {
+            // 获取所有配置的键（例如 "13", "8"），解析为整数
+            List<Integer> sortedThresholds = thresholds.getKeys(false).stream()
+                    .map(key -> {
+                        try {
+                            return Integer.parseInt(key);
+                        } catch (NumberFormatException e) {
+                            return -1; // 忽略非数字键
+                        }
+                    })
+                    .filter(key -> key > 0)
+                    .sorted(Collections.reverseOrder()) // 降序排列 (例如: 13, 8)
+                    .collect(Collectors.toList());
+
+            // 遍历排序后的阈值
+            for (int threshold : sortedThresholds) {
+                // 如果当前玩家数 >= 阈值，就使用该阈值对应的逃生者数量
+                if (totalPlayers >= threshold) {
+                    return thresholds.getInt(String.valueOf(threshold), 1);
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * 给玩家添加永久发光效果
+     */
+    private void applyGlowingEffect(Player player) {
+        PotionEffect glowing = new PotionEffect(
+                PotionEffectType.GLOWING,  // 效果类型：发光
+                Integer.MAX_VALUE,         // 持续时间：无限
+                0,                         // 等级：0
+                false,                     // 是否隐藏粒子效果
+                false                      // 是否隐藏效果图标
+        );
+        player.addPotionEffect(glowing);
+    }
+
+    private World getOrCreateEndWorld() {
+        World end = Bukkit.getWorld("world_the_end");
+        if (end == null) {
+            WorldCreator creator = new WorldCreator("world_the_end");
+            creator.environment(World.Environment.THE_END);
+            end = Bukkit.createWorld(creator);
+        }
+        if (end != null) {
+            end.setTime(6000);
+            end.setStorm(false);
+            end.setThundering(false);
+        }
+        return end;
+    }
+
+    private void teleportPlayers(World endWorld) {
+        // 末地主岛中心坐标
+        Location center = new Location(endWorld, 100, 70, 0);
+
+        // 逃生者出生点 (所有逃生者在同一位置)
+        Location escLoc = findSafeLocation(endWorld, center, 0);
+
+        for (Player esc : finalBattleEscapers) {
+            esc.teleport(escLoc);
+            esc.setBedSpawnLocation(escLoc, true);
+        }
+
+        // 猎人出生点（距离30米）
+        Location huntLoc = findOffsetLocation(endWorld, center, 30);
+        for (Player h : hunters) {
+            h.teleport(huntLoc);
+            h.setBedSpawnLocation(huntLoc, true);
+        }
+    }
+
+    private void giveConfiguredEquipment() {
+        // 逃生者装备
+        for (Player esc : finalBattleEscapers) {
+            givePlayerEquipment(esc, "final_battle.escaper");
+        }
+        // 猎人装备
+        for (Player h : hunters) {
+            givePlayerEquipment(h, "final_battle.hunter");
+        }
+    }
+
+    private void givePlayerEquipment(Player player, String configPath) {
+        player.getInventory().clear(); // 清空背包
+        player.getEquipment().clear(); // 清空已穿戴装备
+
+        // 发放武器
+        if (plugin.getConfig().contains(configPath + ".weapon")) {
+            String weapon = plugin.getConfig().getString(configPath + ".weapon");
+            ItemStack weaponItem = parseItem(weapon); // 解析物品配置
+            if (weaponItem != null) {
+                player.getInventory().setItemInMainHand(weaponItem); // 主手装备武器
+            }
+        }
+
+        // 发放盔甲
+        String[] armorSlots = {"helmet", "chestplate", "leggings", "boots"};
+        EquipmentSlot[] equipmentSlots = {
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        };
+
+        for (int i = 0; i < armorSlots.length; i++) {
+            String part = armorSlots[i];
+            if (plugin.getConfig().contains(configPath + "." + part)) {
+                String armorConfig = plugin.getConfig().getString(configPath + "." + part);
+                ItemStack armorItem = parseItem(armorConfig); // 解析盔甲配置
+                if (armorItem != null) {
+                    // 将盔甲直接穿戴到对应槽位
+                    player.getEquipment().setItem(equipmentSlots[i], armorItem);
+                }
+            }
+        }
+
+        // 发放其他物品
+        if (plugin.getConfig().contains(configPath + ".items")) {
+            for (String itemConfig : plugin.getConfig().getStringList(configPath + ".items")) {
+                ItemStack item = parseItem(itemConfig);
+                if (item != null) {
+                    player.getInventory().addItem(item); // 物品放入背包
+                }
+            }
+        }
+
+        // 应用药水效果
+        if (plugin.getConfig().contains(configPath + ".potion_effects")) {
+            for (String effect : plugin.getConfig().getStringList(configPath + ".potion_effects")) {
+                applyPotionEffect(player, effect);
+            }
+        }
+
+        // 设置最大生命值
+        double maxHealth = plugin.getConfig().getDouble(configPath + ".max_health", 20);
+        player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
+        player.setHealth(maxHealth); // 生命值回满
+    }
+
+    // 解析物品配置字符串（格式: 物品类型:数量:附魔1=等级,附魔2=等级）
+    private ItemStack parseItem(String configStr) {
+        String[] parts = configStr.split(":");
+        if (parts.length < 1) return null;
+
+        // 解析物品类型
+        Material material;
+        try {
+            material = Material.valueOf(parts[0].toUpperCase());
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger().warning("无效物品类型: " + parts[0]);
+            return null;
+        }
+
+        // 解析数量
+        int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+        ItemStack item = new ItemStack(material, amount);
+
+        // 解析附魔
+        if (parts.length > 2) {
+            String[] enchants = parts[2].split(",");
+            for (String ench : enchants) {
+                String[] enchParts = ench.split("=");
+                if (enchParts.length == 2) {
+                    try {
+                        // 解析附魔
+                        Enchantment enchantment = Enchantment.getByKey(
+                                NamespacedKey.minecraft(enchParts[0].toLowerCase())
+                        );
+                        int level = Integer.parseInt(enchParts[1]);
+                        if (enchantment != null) {
+                            item.addUnsafeEnchantment(enchantment, level);
+                        }
+                    } catch (Exception ex) {
+                        plugin.getLogger().warning("无效附魔配置: " + ench + "（物品: " + configStr + "）");
+                    }
+                }
+            }
+        }
+
+        return item;
+    }
+
+
+    private void applyPotionEffect(Player p, String effectStr) {
+        // 格式: 效果类型:等级:持续时间(秒)
+        String[] parts = effectStr.split(":");
+        if (parts.length < 3) return;
+
+        PotionEffectType type = PotionEffectType.getByName(parts[0].toUpperCase());
+        if (type == null) return;
+
+        try {
+            int amp = Integer.parseInt(parts[1]) - 1;
+            int duration = Integer.parseInt(parts[2]) * 20;
+            p.addPotionEffect(new PotionEffect(type, duration, amp, true, true));
+        } catch (NumberFormatException e) {
+            plugin.getLogger().warning("无效药水效果: " + effectStr);
+        }
+    }
+
+
+    private Location findSafeLocation(World world, Location center, double offset) {
+        Random rand = new Random();
+        int attempts = 0;
+
+        while (attempts < 100) {
+            double angle = rand.nextDouble() * Math.PI * 2;
+            double x = center.getX() + Math.cos(angle) * offset;
+            double z = center.getZ() + Math.sin(angle) * offset;
+
+            // 找到最高方块
+            int y = world.getHighestBlockYAt((int) x, (int) z);
+            Location loc = new Location(world, x, y + 1, z);
+
+            if (isLocationSafe(loc)) {
+                return loc;
+            }
+
+            attempts++;
+        }
+        return center;
+    }
+
+    private Location findOffsetLocation(World world, Location center, double distance) {
+        // 寻找与中心位置相隔指定距离的安全位置
+        Random rand = new Random();
+        double angle = rand.nextDouble() * Math.PI * 2;
+
+        double x = center.getX() + Math.cos(angle) * distance;
+        double z = center.getZ() + Math.sin(angle) * distance;
+
+        // 找到最高方块
+        int y = world.getHighestBlockYAt((int) x, (int) z);
+        Location loc = new Location(world, x, y + 1, z);
+
+        if (isLocationSafe(loc)) {
+            return loc;
+        }
+
+        // 如果不安全，尝试其他方法或返回中心位置
+        return findSafeLocation(world, center, distance);
+    }
+
+    private boolean isLocationSafe(Location loc) {
+        // 检查位置是否安全
+        Block feet = loc.getBlock();
+        Block head = loc.clone().add(0, 1, 0).getBlock();
+        Block below = loc.clone().add(0, -1, 0).getBlock();
+
+        return !feet.getType().isSolid() &&
+                !head.getType().isSolid() &&
+                below.getType().isSolid() &&
+                !feet.isLiquid() &&
+                !head.isLiquid();
+    }
+}
