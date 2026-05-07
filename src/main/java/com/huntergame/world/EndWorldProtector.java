@@ -20,7 +20,7 @@ public class EndWorldProtector {
     private final int PROTECT_X = 0;
     private final int PROTECT_Y = 70;
     private final int PROTECT_Z = 0;
-    private final int PROTECT_RADIUS = 1; // 3x3区域 (半径1)
+    private final int PROTECT_RADIUS = 1;
 
     public EndWorldProtector(HunterGame plugin) {
         this.plugin = plugin;
@@ -89,3 +89,4 @@ public class EndWorldProtector {
         protectedWorlds.clear();
     }
 }
+

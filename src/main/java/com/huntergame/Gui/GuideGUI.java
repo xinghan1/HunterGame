@@ -1,7 +1,8 @@
-package com.huntergame.Gui;
+package com.huntergame.gui;
 
-import com.huntergame.BE.BedrockGuideGUI;
+import com.huntergame.bedrock.BedrockGuideGUI;
 import com.huntergame.HunterGame;
+import com.huntergame.util.BedrockSupport;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -107,9 +108,6 @@ public class GuideGUI implements Listener {
         for (String line : config.getStringList("trigger-item.lore")) {
             lore.add(ChatColor.translateAlternateColorCodes('&', line));
         }
-        // 新增：添加"不可移动"提示
-        lore.add("");
-        lore.add(ChatColor.RED + "不可丢弃或移动");
 
         triggerItem = new ItemStack(material);
         ItemMeta meta = triggerItem.getItemMeta();
@@ -120,7 +118,6 @@ public class GuideGUI implements Listener {
             PersistentDataContainer container = meta.getPersistentDataContainer();
             container.set(new NamespacedKey(plugin, persistentKey),
                     PersistentDataType.STRING, persistentKey);
-            // 新增：添加物品flags，隐藏附魔等信息（可选）
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
             triggerItem.setItemMeta(meta);
         }
@@ -226,13 +223,12 @@ public class GuideGUI implements Listener {
         String triggerAction = config.getString("trigger-item.trigger-action", "RIGHT_CLICK");
         boolean isRight = action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
         boolean isLeft = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK;
-
         if ((triggerAction.equalsIgnoreCase("RIGHT_CLICK") && isRight) ||
                 (triggerAction.equalsIgnoreCase("LEFT_CLICK") && isLeft) ||
                 (triggerAction.equalsIgnoreCase("BOTH") && (isRight || isLeft))) {
-            if (plugin.getBaseAPI() != null) {
+            if (BedrockSupport.isBedrockPlayer(plugin, player)) {
                 try {
-                    BedrockGuideGUI.openBedrockGuide(guideItems, guiTitle, player);
+                    BedrockGuideGUI.openBedrockGuide(plugin, guideItems, guiTitle, player);
                 } catch (Exception e) {
                     openGuideGUI(player);
                 }
@@ -285,14 +281,12 @@ public class GuideGUI implements Listener {
         // 情况1：点击了触发物品
         if (current != null && isTriggerItem(current)) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "该物品不能移动或丢弃！");
             return;
         }
 
         // 情况2：鼠标上有触发物品（尝试放置）
         if (cursor != null && isTriggerItem(cursor)) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "该物品不能移动或丢弃！");
         }
     }
 
@@ -305,7 +299,6 @@ public class GuideGUI implements Listener {
         ItemStack item = event.getItemDrop().getItemStack();
         if (isTriggerItem(item)) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "该物品不能丢弃！");
         }
     }
 
@@ -321,7 +314,6 @@ public class GuideGUI implements Listener {
         if ((mainHand != null && isTriggerItem(mainHand)) ||
                 (offHand != null && isTriggerItem(offHand))) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "该物品不能切换到副手！");
         }
     }
 
@@ -373,7 +365,7 @@ public class GuideGUI implements Listener {
     private void handleItemClick(Player player, String action) {
         if (action == null || action.equalsIgnoreCase("none")) return;
         if (action.equalsIgnoreCase("open-submenu")) {
-            player.sendMessage(ChatColor.GREEN + "打开子菜单（示例）");
+            player.sendMessage(plugin.getMessage("guide_open_submenu", "&a打开子菜单（示例）"));
         }
     }
 
@@ -398,3 +390,4 @@ public class GuideGUI implements Listener {
         loadConfig();
     }
 }
+

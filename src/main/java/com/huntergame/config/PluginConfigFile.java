@@ -43,7 +43,7 @@ public class PluginConfigFile {
         return ChatColor.translateAlternateColorCodes('&', value);
     }
 
-    private void save() {
+    public void save() {
         try {
             config.save(file);
         } catch (IOException e) {
@@ -51,3 +51,4 @@ public class PluginConfigFile {
         }
     }
 }
+

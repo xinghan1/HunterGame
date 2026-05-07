@@ -4,7 +4,7 @@
   <groupId>com</groupId>
   <artifactId>HunterGame</artifactId>
   <name>HunterGame</name>
-  <version>8.0v</version>
+  <version>9.0v</version>
   <build>
     <resources>
       <resource>
@@ -48,6 +48,10 @@
       <id>sonatype</id>
       <url>https://oss.sonatype.org/content/groups/public/</url>
     </repository>
+    <repository>
+      <id>opencollab-snapshot</id>
+      <url>https://repo.opencollab.dev/main/</url>
+    </repository>
   </repositories>
   <dependencies>
     <dependency>
@@ -57,9 +61,15 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.geysermc.floodgate</groupId>
+      <artifactId>api</artifactId>
+      <version>2.2.4-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>com.xigua</groupId>
       <artifactId>BaseAPI</artifactId>
-      <version>1.0.2</version>
+      <version>1.0.3</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

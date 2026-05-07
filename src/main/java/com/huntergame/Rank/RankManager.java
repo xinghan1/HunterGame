@@ -1,9 +1,10 @@
-package com.huntergame.Rank;
+package com.huntergame.rank;
 
 import com.huntergame.HunterGame;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.util.*;
@@ -20,35 +21,27 @@ public class RankManager {
     private double GameStartReward; // 游戏开始奖励
 
     private double FinalBattle_EscaperKillReward; // 终章之逃 生者击杀
-    private double SkillBattle_EscaperKillReward; // 技能之战 逃生者击杀
     private double OrdinaryBattle_EscaperKillReward; // 原版猎人 逃生者击杀
 
     private double FinalBattle_HunterKillReward; // 终章之战 猎人击杀
-    private double SkillBattle_HunterKillReward; // 技能之战 猎人击杀
     private double OrdinaryBattle_HunterKillReward; // 原版猎人 猎人击杀
 
     private double FinalBattle_EscaperDeathReward; // 终章之战 逃生者死亡
-    private double SkillBattle_EscaperDeathReward; // 技能之战 逃生者死亡
     private double OrdinaryBattle_EscaperDeathReward; // 原版猎人 逃生者死亡
 
     private double FinalBattle_HunterDeathReward; // 终章之战 猎人死亡
-    private double SkillBattle_HunterDeathReward; // 技能之战 猎人死亡
     private double OrdinaryBattle_HunterDeathReward; // 原版猎人 猎人死亡
 
     private double FinalBattle_EscaperWinReward; // 终章之战 逃生者胜利
-    private double SkillBattle_EscaperWinReward; // 技能之战 逃生者胜利
     private double OrdinaryBattle_EscaperWinReward; // 原版猎人 逃生者胜利
 
     private double FinalBattle_HunterFailReward; // 终章之战 猎人失败
-    private double SkillBattle_HunterFailReward; // 技能之战 猎人失败
     private double OrdinaryBattle_HunterFailReward; // 原版猎人 猎人失败
 
     private double FinalBattle_EscaperFailReward; // 终章之战 逃生者失败
-    private double SkillBattle_EscaperFailReward; // 技能之战 逃生者失败
     private double OrdinaryBattle_EscaperFailReward; // 原版猎人 逃生者失败
 
     private double FinalBattle_HunterWinReward; // 终章之战 猎人胜利
-    private double SkillBattle_HunterWinReward; // 技能之战 猎人胜利
     private double OrdinaryBattle_HunterWinReward; // 原版猎人 猎人胜利
 
 
@@ -108,35 +101,27 @@ public class RankManager {
             GameStartReward = rewardsSection.getDouble("GameStartReward", 0.3);
 
             FinalBattle_EscaperKillReward = rewardsSection.getDouble("FinalBattle_EscaperKillReward", 0.5);
-            SkillBattle_EscaperKillReward = rewardsSection.getDouble("SkillBattle_EscaperKillReward", 0.3);
             OrdinaryBattle_EscaperKillReward = rewardsSection.getDouble("OrdinaryBattle_EscaperKillReward", 0.4);
 
             FinalBattle_HunterKillReward = rewardsSection.getDouble("FinalBattle_HunterKillReward", 0.5);
-            SkillBattle_HunterKillReward = rewardsSection.getDouble("SkillBattle_HunterKillReward", 0.3);
             OrdinaryBattle_HunterKillReward = rewardsSection.getDouble("OrdinaryBattle_HunterKillReward", 0.4);
 
             FinalBattle_EscaperDeathReward = rewardsSection.getDouble("FinalBattle_EscaperDeathReward", -1.5);
-            SkillBattle_EscaperDeathReward = rewardsSection.getDouble("SkillBattle_EscaperDeathReward", -1.5);
             OrdinaryBattle_EscaperDeathReward = rewardsSection.getDouble("OrdinaryBattle_EscaperDeathReward", -1);
 
             FinalBattle_HunterDeathReward = rewardsSection.getDouble("FinalBattle_HunterDeathReward", -0.3);
-            SkillBattle_HunterDeathReward = rewardsSection.getDouble("SkillBattle_HunterDeathReward", -0.4);
             OrdinaryBattle_HunterDeathReward = rewardsSection.getDouble("OrdinaryBattle_HunterDeathReward", -0.4);
 
             FinalBattle_EscaperWinReward = rewardsSection.getDouble("FinalBattle_EscaperWinReward", 3);
-            SkillBattle_EscaperWinReward = rewardsSection.getDouble("SkillBattle_EscaperWinReward", 7);
             OrdinaryBattle_EscaperWinReward = rewardsSection.getDouble("OrdinaryBattle_EscaperWinReward", 8);
 
             FinalBattle_EscaperFailReward = rewardsSection.getDouble("FinalBattle_EscaperFailReward", -1);
-            SkillBattle_EscaperFailReward = rewardsSection.getDouble("SkillBattle_EscaperFailReward", -2);
             OrdinaryBattle_EscaperFailReward = rewardsSection.getDouble("OrdinaryBattle_EscaperFailReward", -2);
 
             FinalBattle_HunterWinReward = rewardsSection.getDouble("FinalBattle_HunterWinReward", 1);
-            SkillBattle_HunterWinReward = rewardsSection.getDouble("SkillBattle_HunterWinReward", 2);
             OrdinaryBattle_HunterWinReward = rewardsSection.getDouble("OrdinaryBattle_HunterWinReward", 1.5);
 
             FinalBattle_HunterFailReward = rewardsSection.getDouble("FinalBattle_HunterFailReward", -1);
-            SkillBattle_HunterFailReward = rewardsSection.getDouble("SkillBattle_HunterFailReward", -1.5);
             OrdinaryBattle_HunterFailReward = rewardsSection.getDouble("OrdinaryBattle_HunterFailReward", -1.5);
         }
 
@@ -189,11 +174,41 @@ public class RankManager {
         return GameStartReward;
     }
 
+    public boolean isSettlementProficiencyEnabled() {
+        ConfigurationSection rewardsSection = rankConfig.getConfigurationSection("proficiency-rewards");
+        return rewardsSection != null && rewardsSection.getBoolean("enabled", true);
+    }
+
+    public double calculateSettlementProficiency(Player player, String role, int kills, double damage, int deaths, boolean win) {
+        if (player == null || !isSettlementProficiencyEnabled()) {
+            return 0.0;
+        }
+        String modeKey = plugin.isFinalBattleMode() ? "final_battle" : "ordinary_battle";
+        return calculateSettlementProficiency(modeKey, role, kills, damage, deaths, win);
+    }
+
+    public double calculateSettlementProficiency(String modeKey, String role, int kills, double damage, int deaths, boolean win) {
+        ConfigurationSection rewardsSection = rankConfig.getConfigurationSection("proficiency-rewards");
+        if (rewardsSection == null || !rewardsSection.getBoolean("enabled", true)) {
+            return 0.0;
+        }
+
+        String cleanMode = modeKey == null ? "" : modeKey.trim();
+        String cleanRole = role == null ? "" : role.trim();
+        if (cleanMode.isEmpty() || cleanRole.isEmpty()) {
+            return 0.0;
+        }
+
+        double reward = kills * rewardsSection.getDouble(cleanMode + "." + cleanRole + ".kill", 0.0)
+                + damage * rewardsSection.getDouble(cleanMode + "." + cleanRole + ".damage", 0.0)
+                + deaths * rewardsSection.getDouble(cleanMode + "." + cleanRole + ".death", 0.0)
+                + rewardsSection.getDouble(cleanMode + "." + cleanRole + "." + (win ? "win" : "fail"), 0.0);
+        double multiplier = rewardsSection.getDouble(cleanMode + ".multiplier", 1.0);
+        return reward * multiplier;
+    }
+
     public double getFinalBattle_EscaperKillReward() {
         return FinalBattle_EscaperKillReward;
-    }
-    public double getSkillBattle_EscaperKillReward() {
-        return SkillBattle_EscaperKillReward;
     }
     public double getOrdinaryBattle_EscaperKillReward() {
         return OrdinaryBattle_EscaperKillReward;
@@ -202,18 +217,12 @@ public class RankManager {
     public double getFinalBattle_HunterKillReward() {
         return FinalBattle_HunterKillReward;
     }
-    public double getSkillBattle_HunterKillReward() {
-        return SkillBattle_HunterKillReward;
-    }
     public double getOrdinaryBattle_HunterKillReward() {
         return OrdinaryBattle_HunterKillReward;
     }
 
     public double getFinalBattle_EscaperDeathReward() {
         return FinalBattle_EscaperDeathReward;
-    }
-    public double getSkillBattle_EscaperDeathReward() {
-        return SkillBattle_EscaperDeathReward;
     }
     public double getOrdinaryBattle_EscaperDeathReward() {
         return OrdinaryBattle_EscaperDeathReward;
@@ -222,18 +231,12 @@ public class RankManager {
     public double getFinalBattle_HunterDeathReward() {
         return FinalBattle_HunterDeathReward;
     }
-    public double getSkillBattle_HunterDeathReward() {
-        return SkillBattle_HunterDeathReward;
-    }
     public double getOrdinaryBattle_HunterDeathReward() {
         return OrdinaryBattle_HunterDeathReward;
     }
 
     public double getFinalBattle_EscaperWinReward() {
         return FinalBattle_EscaperWinReward;
-    }
-    public double getSkillBattle_EscaperWinReward() {
-        return SkillBattle_EscaperWinReward;
     }
     public double getOrdinaryBattle_EscaperWinReward() {
         return OrdinaryBattle_EscaperWinReward;
@@ -242,18 +245,12 @@ public class RankManager {
     public double getFinalBattle_EscaperFailReward() {
         return FinalBattle_EscaperFailReward;
     }
-    public double getSkillBattle_EscaperFailReward() {
-        return SkillBattle_EscaperFailReward;
-    }
     public double getOrdinaryBattle_EscaperFailReward() {
         return OrdinaryBattle_EscaperFailReward;
     }
 
     public double getFinalBattle_HunterWinReward() {
         return FinalBattle_HunterWinReward;
-    }
-    public double getSkillBattle_HunterWinReward() {
-        return SkillBattle_HunterWinReward;
     }
     public double getOrdinaryBattle_HunterWinReward() {
         return OrdinaryBattle_HunterWinReward;
@@ -262,11 +259,9 @@ public class RankManager {
     public double getFinalBattle_HunterFailReward() {
         return FinalBattle_HunterFailReward;
     }
-    public double getSkillBattle_HunterFailReward() {
-        return SkillBattle_HunterFailReward;
-    }
     public double getOrdinaryBattle_HunterFailReward() {
         return OrdinaryBattle_HunterFailReward;
     }
 
 }
+

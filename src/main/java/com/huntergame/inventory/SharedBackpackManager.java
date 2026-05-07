@@ -2,7 +2,6 @@ package com.huntergame.inventory;
 
 import com.huntergame.HunterGame;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -19,8 +18,6 @@ public class SharedBackpackManager implements Listener {
 
     public static final int BACKPACK_SLOT = 8;
     public static final int INVENTORY_SIZE = 27;
-    public static final String HUNTER_BACKPACK_NAME = ChatColor.RED + "猎人共享背包";
-    public static final String ESCAPER_BACKPACK_NAME = ChatColor.BLUE + "逃生者共享背包";
 
     private final HunterGame plugin;
     private final Inventory hunterInventory;
@@ -30,10 +27,12 @@ public class SharedBackpackManager implements Listener {
 
     public SharedBackpackManager(HunterGame plugin) {
         this.plugin = plugin;
-        this.hunterInventory = Bukkit.createInventory(null, INVENTORY_SIZE, HUNTER_BACKPACK_NAME);
-        this.escaperInventory = Bukkit.createInventory(null, INVENTORY_SIZE, ESCAPER_BACKPACK_NAME);
-        this.hunterBackpackItem = createBackpackItem(HUNTER_BACKPACK_NAME, ChatColor.GRAY + "右键打开猎人共享背包");
-        this.escaperBackpackItem = createBackpackItem(ESCAPER_BACKPACK_NAME, ChatColor.GRAY + "右键打开逃生者共享背包");
+        String hunterBackpackName = plugin.getMessage("hunter_backpack_name", "&c猎人共享背包");
+        String escaperBackpackName = plugin.getMessage("escaper_backpack_name", "&9逃生者共享背包");
+        this.hunterInventory = Bukkit.createInventory(null, INVENTORY_SIZE, hunterBackpackName);
+        this.escaperInventory = Bukkit.createInventory(null, INVENTORY_SIZE, escaperBackpackName);
+        this.hunterBackpackItem = createBackpackItem(hunterBackpackName, plugin.getMessage("hunter_backpack_lore", "&7右键打开猎人共享背包"));
+        this.escaperBackpackItem = createBackpackItem(escaperBackpackName, plugin.getMessage("escaper_backpack_lore", "&7右键打开逃生者共享背包"));
     }
 
     public Inventory getHunterInventory() {
@@ -44,17 +43,22 @@ public class SharedBackpackManager implements Listener {
         return escaperInventory;
     }
 
+    public void clearBackpacks() {
+        hunterInventory.clear();
+        escaperInventory.clear();
+    }
+
     public void giveBackpack(Player player, boolean hunter) {
         ItemStack backpack = hunter ? hunterBackpackItem : escaperBackpackItem;
         player.getInventory().setItem(BACKPACK_SLOT, backpack.clone());
     }
 
     public boolean isHunterBackpack(ItemStack item) {
-        return hasDisplayName(item, HUNTER_BACKPACK_NAME);
+        return hasDisplayName(item, plugin.getMessage("hunter_backpack_name", "&c猎人共享背包"));
     }
 
     public boolean isEscaperBackpack(ItemStack item) {
-        return hasDisplayName(item, ESCAPER_BACKPACK_NAME);
+        return hasDisplayName(item, plugin.getMessage("escaper_backpack_name", "&9逃生者共享背包"));
     }
 
     @EventHandler
@@ -95,3 +99,4 @@ public class SharedBackpackManager implements Listener {
         return meta != null && meta.hasDisplayName() && displayName.equals(meta.getDisplayName());
     }
 }
+

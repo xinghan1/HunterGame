@@ -1,8 +1,9 @@
 package com.huntergame.game;
 
-import com.huntergame.*;
+import com.huntergame.HunterGame;
+import com.huntergame.role.RoleSelectionHandler;
 import com.huntergame.util.SafeLocationFinder;
-import com.huntergame.votesystem.VoteSystem;
+import com.huntergame.vote.VoteSystem;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
@@ -18,6 +19,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -38,7 +40,7 @@ public class StartGame implements Listener {
     private int countdownTaskId = -1; // 保存当前倒计时任务的 ID
     private final Map<UUID, Integer> respawnTimers = new HashMap<>(); // 存储玩家 UUID 和剩余复活时间
     private final Map<UUID, BukkitRunnable> respawnTasks = new HashMap<>(); // 存储玩家 UUID 和复活任务
-    private final Map<UUID, Integer> finalBattleRespawnCount = new HashMap<>(); // 终章模式猎人复活次数记录
+    private final Map<UUID, Integer> finalBattleHunterRespawns = new HashMap<>();
     private final Map<UUID, Location> netherPortalLocations = new HashMap<>(); // 记录玩家进入地狱门的主世界坐标
     // 记录玩家最后一次打开背包的时间
     private final Map<UUID, Long> hunterBackpackCooldown = new HashMap<>();
@@ -57,8 +59,8 @@ public class StartGame implements Listener {
         this.locationFinder = new SafeLocationFinder(plugin);
 
         FileConfiguration config = plugin.getConfig();
-        HUNTER_SHARED_BACKPACK_COOLDOWN = config.getInt("hunter_shared_backpack", 90);
-        ESCAPER_SHARED_BACKPACK_COOLDOWN = config.getInt("escaper_shared_backpack", 90);
+        HUNTER_SHARED_BACKPACK_COOLDOWN = config.getInt("game.hunter_shared_backpack", config.getInt("hunter_shared_backpack", 90));
+        ESCAPER_SHARED_BACKPACK_COOLDOWN = config.getInt("game.escaper_shared_backpack", config.getInt("escaper_shared_backpack", 90));
     }
 
 
@@ -144,7 +146,8 @@ public class StartGame implements Listener {
 
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
         if (players.size() < minPlayers) {
-            Bukkit.broadcastMessage(ChatColor.RED + "当前游戏以最小" + minPlayers + " 人，开始游戏！");
+            Bukkit.broadcastMessage(plugin.getMessage("not_enough_players_start", "&c当前游戏最少需要 %min_players% 人才能开始！")
+                    .replace("%min_players%", String.valueOf(minPlayers)));
             return;
         }
         startCountdown(countdownTime);
@@ -224,8 +227,25 @@ public class StartGame implements Listener {
      * 清空终章模式的复活次数记录
      */
     public void clearFinalBattleRespawnData() {
-        finalBattleRespawnCount.clear();
+        finalBattleHunterRespawns.clear();
         netherPortalLocations.clear();
+    }
+
+    public void resetRuntimeData() {
+        cancelCountdown();
+        for (BukkitRunnable task : respawnTasks.values()) {
+            task.cancel();
+        }
+        respawnTasks.clear();
+        respawnTimers.clear();
+        finalBattleHunterRespawns.clear();
+        netherPortalLocations.clear();
+        hunterBackpackCooldown.clear();
+        escaperBackpackCooldown.clear();
+        playerVotes.clear();
+        assignedEscapers.clear();
+        assignedHunters.clear();
+        voteSystem.resetVoteData();
     }
 
     /**
@@ -233,6 +253,9 @@ public class StartGame implements Listener {
      */
     private void checkAndCancelCountdownIfNeeded() {
         if (plugin.isGameRunning()) return;
+        if (plugin.isResetting()) return;
+        if (plugin.isGameEnded()) return;
+
         int minPlayers = plugin.getConfig().getInt("game.minPlayers", 2);
         if (Bukkit.getOnlinePlayers().size() < minPlayers) {
             cancelCountdown();
@@ -379,7 +402,6 @@ public class StartGame implements Listener {
      * 开始游戏逻辑
      */
     public void startGame() {
-
         if (plugin.isGameRunning()) {
             Bukkit.broadcastMessage(plugin.getMessage("game_progress", "&c游戏已经在进行中，不能重复启动！"));
             return;
@@ -391,27 +413,25 @@ public class StartGame implements Listener {
         int selectedMode = voteSystem.determineFinalGameMode();
         int selectedType = voteSystem.determineFinalBattleType();
         plugin.setBattleType(selectedType);
+
         // 启动对应模式
-        if (selectedMode == VoteSystem.MODE_SKILL_BATTLE) {
-            plugin.setGameMode(HunterGame.MODE_SKILL_BATTLE);
-            startSkillBattleMode();
-        } else if (selectedMode == VoteSystem.MODE_VANILLA_HUNTER) {
+        if (selectedMode == VoteSystem.MODE_VANILLA_HUNTER) {
             plugin.setGameMode(HunterGame.MODE_VANILLA_HUNTER);
             startVanillaHunterMode();
         } else {
             plugin.setGameMode(HunterGame.MODE_FINAL_BATTLE);
             new FinalBattleManager(plugin, voteSystem.getPlayerRoleVotes()).startFinalBattle();
         }
+
     }
 
     /**
      * 统一处理已分配角色的初始化
-     * @param isSkillMode 是否为技能模式
      */
-    public void startAssigned(boolean isSkillMode) {
+    public void startAssigned() {
         // 1. 获取配置数据
-        double hunterHealth = isSkillMode ? plugin.getConfig().getDouble("game.hunter_max_health", 20.0) : 20.0;
-        double escaperHealth = isSkillMode ? plugin.getConfig().getDouble("game.escaper_max_health", 20.0) : 20.0;
+        double hunterHealth = 20.0;
+        double escaperHealth = 20.0;
 
         // 预加载消息，避免循环内重复获取
         String hunterTitle = plugin.getMessage("hunter_title", "&a你是 &c猎人！");
@@ -420,7 +440,7 @@ public class StartGame implements Listener {
         String escaperTitle = plugin.getMessage("escaper_title", "&a你是 &b逃生者！");
         String escaperMsg = plugin.getMessage("escaper_identity", "&a你是 &b逃生者！");
 
-        // 2. 初始化猎人
+        // 初始化猎人
         for (Player hunter : assignedHunters) {
             plugin.addHunter(hunter.getUniqueId());
             giveHunterMark(hunter);
@@ -433,9 +453,7 @@ public class StartGame implements Listener {
 
             // 功能性物品
             plugin.getHunterTracker().assignCompassAndTracking(hunter, false);
-            if (isSkillMode) {
-                plugin.giveSharedBackpack(hunter, true); // 仅技能模式给予背包
-            }
+            plugin.giveSharedBackpack(hunter, true);
 
             // 消息与奖励
             plugin.getDataStorageManager().addProficiency(hunter, plugin.getRankManager().getGameStartReward());
@@ -456,9 +474,7 @@ public class StartGame implements Listener {
 
             // 功能性物品
             plugin.getHunterTracker().assignCompassAndTracking(escaper, true); // 逃生者不需要指南针，但可能需要注册被追踪状态
-            if (isSkillMode) {
-                plugin.giveSharedBackpack(escaper, false); // 仅技能模式给予背包
-            }
+            plugin.giveSharedBackpack(escaper, false);
 
             // 消息与奖励
             plugin.getDataStorageManager().addProficiency(escaper, plugin.getRankManager().getGameStartReward());
@@ -467,53 +483,9 @@ public class StartGame implements Listener {
         }
     }
 
-    public void startSkillBattleMode() {
-        if (!prepareCommonGameLogic()) return;
-        plugin.getEffect().startEnhancementTask();
-        startAssigned(true);
-
-        World world = Bukkit.getWorld("world");
-        Location center = world.getSpawnLocation();
-
-        teleportGroupedPlayersAsync(assignedEscapers, assignedHunters, world, center, () -> {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Bukkit.getOnlinePlayers().forEach(player -> {
-                    plugin.getSkillManager().openSkillSelection(player);
-                });
-            }, 100L);
-
-            broadcastPlayerCounts();
-
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                plugin.glassCageManager.createCage(player);
-                plugin.getDataStorageManager().addGamePlayed(player.getUniqueId(), player);
-                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 999999 * 20, 1));
-            }
-
-            plugin.setGameInProgress(true);
-
-        });
-
-        Bukkit.broadcastMessage(ChatColor.GREEN + "===== 技能之战 已启动 =====");
-
-        // 根据战役类型广播不同的目标
-        if (plugin.isPersistenceBattle()) {
-            int minutes = plugin.getConfig().getInt("game.persistence_modes.skill_battle_minutes", 25);
-            Bukkit.broadcastMessage(ChatColor.YELLOW + "【持久战模式】");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：存活 " + minutes + " 分钟 或 击杀末影龙 •");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：击杀全部逃生者 •");
-        } else {
-            Bukkit.broadcastMessage(ChatColor.YELLOW + "【通关战模式】");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：击杀末影龙 •");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：击杀全部逃生者 •");
-        }
-
-        broadcastTeamRatio();
-    }
-
     public void startVanillaHunterMode() {
         if (!prepareCommonGameLogic()) return;
-        startAssigned(false);
+        startAssigned();
 
         World world = Bukkit.getWorld("world");
         Location center = world.getSpawnLocation();
@@ -532,21 +504,20 @@ public class StartGame implements Listener {
             plugin.glassCageManager.createGroupCage(allPlayers, cageCenter);
         });
 
-        Bukkit.broadcastMessage(ChatColor.GRAY + "===== 原版猎人 已启动 =====");
+        Bukkit.broadcastMessage(plugin.getMessage("vanilla_hunter_started", "&7===== 经典猎人 已启动 ====="));
 
         // 根据战役类型广播不同的目标
         if (plugin.isPersistenceBattle()) {
             int minutes = plugin.getConfig().getInt("game.persistence_modes.vanilla_hunter_minutes", 30);
-            Bukkit.broadcastMessage(ChatColor.YELLOW + "【持久战模式】");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：存活 " + minutes + " 分钟 或 击杀末影龙 •");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：击杀全部逃生者 •");
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_mode_title", "&e【生存战模式】"));
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_escaper_objective", "&7• 逃生者目标：存活 %minutes% 分钟 或 击杀末影龙 •")
+                    .replace("%minutes%", String.valueOf(minutes)));
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_hunter_objective", "&7• 猎人目标：击杀全部逃生者 •"));
         } else {
-            Bukkit.broadcastMessage(ChatColor.RED + "【通关战模式】");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：击杀末影龙 •");
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：击杀全部逃生者 •");
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_mode_title", "&c【通关战模式】"));
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_escaper_objective", "&7• 逃生者目标：击杀末影龙 •"));
+            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_hunter_objective", "&7• 猎人目标：击杀全部逃生者 •"));
         }
-
-        Bukkit.broadcastMessage(ChatColor.GRAY + "• 无技能系统，纯原版机制");
         broadcastTeamRatio();
     }
 
@@ -566,9 +537,6 @@ public class StartGame implements Listener {
         plugin.startGame(); // 游戏计时
         world.setTime(100); // 设置时间为晴天上午
 
-        // 启动通用的奖励任务
-        plugin.getGameRewards().startGameRewardTask();
-
         // 打乱并分配角色
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
         Collections.shuffle(players);
@@ -582,45 +550,16 @@ public class StartGame implements Listener {
 
     private void broadcastPlayerCounts() {
         Bukkit.broadcastMessage(
-                plugin.getMessage("players_count", "&c猎人数量: %hunters% &a| 逃生者数量: %escapers%")
+                plugin.getMessage("players_count", "&c猎人数量: %hunters% &8&l| &b逃生者数量: %escapers%")
                         .replace("%hunters%", String.valueOf(assignedHunters.size()))
                         .replace("%escapers%", String.valueOf(assignedEscapers.size()))
         );
     }
 
     private void broadcastTeamRatio() {
-        Bukkit.broadcastMessage(ChatColor.GRAY + "• 阵营：" + plugin.getEscapers().size() + "名逃生者 vs " + plugin.getHunters().size() + "名猎人 •");
-    }
-
-    public void teleportGroupedPlayersAsync(List<Player> escapers, List<Player> hunters, World world, Location center, Runnable onTeleportComplete) {
-        double minDistance = 100;
-        double maxDistance = 120; // 猎人距离逃生者的距离
-
-        // 第一步：找逃生者位置
-        // 假设逃生者需要在中心点周围 100~1000 格内
-        locationFinder.findLocation(world, center, 100, 1000, (escaperSpawn) -> {
-
-            // 第二步：基于逃生者位置，找猎人位置
-            locationFinder.findLocation(world, escaperSpawn, minDistance, maxDistance, (hunterSpawn) -> {
-
-                // 确保猎人位置不为空（虽然 findLocation 有超时保底，但双重保险）
-                Location finalHunterSpawn = hunterSpawn;
-                if (finalHunterSpawn == null) {
-                    finalHunterSpawn = locationFinder.getFallbackLocation(world, escaperSpawn, minDistance);
-                }
-
-                // 执行传送
-                for (Player escaper : escapers) escaper.teleport(escaperSpawn);
-                for (Player hunter : hunters) hunter.teleport(finalHunterSpawn);
-
-                world.setSpawnLocation(escaperSpawn);
-
-                // 执行完成回调
-                if (onTeleportComplete != null) {
-                    onTeleportComplete.run();
-                }
-            });
-        });
+        Bukkit.broadcastMessage(plugin.getMessage("team_ratio", "&7• 阵营：%escapers%名逃生者 vs %hunters%名猎人 •")
+                .replace("%escapers%", String.valueOf(plugin.getEscapers().size()))
+                .replace("%hunters%", String.valueOf(plugin.getHunters().size())));
     }
 
     @EventHandler
@@ -721,37 +660,27 @@ public class StartGame implements Listener {
         }, 1L);
 
         if (plugin.isFinalBattleMode()) {
-            // 终章之战：检查猎人复活次数限制
             if (plugin.isHunter(playerId)) {
-                int maxRespawns = plugin.getConfig().getInt("final_battle.hunter_max_respawns", 1);
-                int currentRespawns = finalBattleRespawnCount.getOrDefault(playerId, 0);
+                int maxRespawns = plugin.getConfig().getInt("final_battle.hunter_max_respawns", 0);
+                int usedRespawns = finalBattleHunterRespawns.getOrDefault(playerId, 0);
+                player.setGameMode(GameMode.SPECTATOR);
+                plugin.addRealSpectator(playerId);
 
-                if (maxRespawns == 0 || currentRespawns >= maxRespawns) {
-                    // 不允许复活或已达复活上限
-                    player.setGameMode(GameMode.SPECTATOR);
-                    plugin.addRealSpectator(playerId); // 标记为真正的旁观者
-                    player.sendMessage(plugin.getMessage("final_battle_no_respawn", "&c你已死亡，无法复活！"));
-                    // 传送到随机玩家位置
-                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                        plugin.teleportSpectatorToRandomPlayer(player);
-                    }, 20L);
-                    return;
+                if (usedRespawns < maxRespawns) {
+                    int respawnTime = Math.max(0, plugin.getConfig().getInt("final_battle.hunter_respawn_seconds", 30));
+                    finalBattleHunterRespawns.put(playerId, usedRespawns + 1);
+                    respawnTimers.put(playerId, respawnTime);
+                    startRespawnCountdown(player, respawnTime);
+                    player.sendMessage(plugin.getMessage("resurrection_countdown", "&e你还有 %remainingTime% 秒复活！")
+                            .replace("%remainingTime%", String.valueOf(respawnTime)));
+                } else {
+                    player.sendMessage(plugin.getMessage("final_battle_no_respawn", "&c终章模式猎人复活次数已用完！"));
                 }
 
-                // 允许复活，记录复活次数
-                int respawnTime = plugin.getConfig().getInt("final_battle.hunter_respawn_seconds", 30);
-                finalBattleRespawnCount.put(playerId, currentRespawns + 1);
-                player.setGameMode(GameMode.SPECTATOR);
-                plugin.addRealSpectator(playerId); // 标记为真正的旁观者（复活中）
-                player.sendMessage(plugin.getMessage("final_battle_respawn_countdown", "&e你还有 %respawnTime% 秒复活！剩余复活次数: %remaining%")
-                        .replace("%respawnTime%", String.valueOf(respawnTime))
-                        .replace("%remaining%", String.valueOf(maxRespawns - currentRespawns - 1)));
-                respawnTimers.put(playerId, respawnTime);
-                startRespawnCountdown(player, respawnTime);
-                // 传送到随机玩家位置
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     plugin.teleportSpectatorToRandomPlayer(player);
                 }, 20L);
+                return;
             } else {
                 // 逃生者死亡
                 player.setGameMode(GameMode.SPECTATOR);
@@ -776,13 +705,51 @@ public class StartGame implements Listener {
             // 存储剩余复活时间
             respawnTimers.put(playerId, respawnTime);
 
-            // 启动复活倒计时任务
+            // 启动复活倒计时任务R
             startRespawnCountdown(player, respawnTime);
             // 传送到随机玩家位置
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 plugin.teleportSpectatorToRandomPlayer(player);
             }, 20L);
         }
+    }
+
+    @EventHandler
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+
+        if (!plugin.isGameRunning()) {
+            return;
+        }
+
+        boolean shouldStaySpectator = respawnTimers.containsKey(playerId) || plugin.isRealSpectator(playerId);
+        if (!shouldStaySpectator) {
+            return;
+        }
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> forceSpectatorWhileWaiting(player), 1L);
+    }
+
+    private void forceSpectatorWhileWaiting(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        boolean shouldStaySpectator = respawnTimers.containsKey(playerId) || plugin.isRealSpectator(playerId);
+        if (!shouldStaySpectator) {
+            return;
+        }
+
+        player.setGameMode(GameMode.SPECTATOR);
+        plugin.addRealSpectator(playerId);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline() && player.getGameMode() == GameMode.SPECTATOR && plugin.isRealSpectator(playerId)) {
+                plugin.teleportSpectatorToRandomPlayer(player);
+            }
+        }, 2L);
     }
 
 
@@ -819,7 +786,12 @@ public class StartGame implements Listener {
                 // 显示关键倒计时
                 if (timeLeft == 180 || timeLeft == 150 || timeLeft == 120 || timeLeft == 90 ||
                         timeLeft == 60 || timeLeft == 30 || timeLeft <= 10) {
-                    player.sendTitle(ChatColor.RED + "" + timeLeft, "", 0, 20, 0);
+                    player.sendTitle(
+                            plugin.getMessage("cage_countdown_title", "&c%time%")
+                                    .replace("%time%", String.valueOf(timeLeft)),
+                            plugin.getMessage("cage_countdown_subtitle", ""),
+                            0, 20, 0
+                    );
                 }
 
                 respawnTimers.put(playerId, timeLeft); // 更新剩余时间
@@ -833,7 +805,7 @@ public class StartGame implements Listener {
     // 随机偏移范围（±100格）
     private static final int OFFSET_RANGE = 100;
     private void respawnPlayer(Player player) {
-        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20 * 30, 255)); // 给予30秒无敌
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20 * 10, 255)); // 给予10秒无敌
         player.setGameMode(GameMode.SURVIVAL);
         plugin.removeRealSpectator(player.getUniqueId()); // 移除旁观者标记
 
@@ -906,9 +878,9 @@ public class StartGame implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             // 给予复活装备
             if (plugin.isFinalBattleMode()) {
-                // 终章模式使用 final_battle.hunter 配置
-                giveFinalBattleEquipment(player);
+                plugin.getFinalBattleProfessionManager().giveSelectedProfessionLoadout(player);
             } else {
+                plugin.giveSharedBackpack(player, true);
                 // 其他模式使用 hunter_resupply 配置
                 if (plugin.getConfig().getBoolean("hunter_resupply.enable", false)) {
                     giveResupplyItems(player);
@@ -917,7 +889,8 @@ public class StartGame implements Listener {
 
 
             // 检查玩家是否选择了"爆炸弩"技能
-            if ("爆炸弩".equals(plugin.getSkillManager().getSelectedSkill(player))) {
+            if ("爆炸弩".equals(plugin.getSkillManager().getSelectedSkill(player))
+                    && plugin.getSkillManager().isSkillEnabled("爆炸弩")) {
                 plugin.getExplosiveCrossbowListener().giveCrossbowPackage(player);
             }
         }, 40L); // 40 ticks = 2秒
@@ -1186,97 +1159,6 @@ public class StartGame implements Listener {
     }
 
     /**
-     * 给予终章模式猎人装备
-     */
-    private void giveFinalBattleEquipment(Player player) {
-        FileConfiguration config = plugin.getConfig();
-        String configPath = "final_battle.hunter";
-
-        // 发放武器
-        if (config.contains(configPath + ".weapon")) {
-            String weapon = config.getString(configPath + ".weapon");
-            ItemStack weaponItem = parseItem(weapon);
-            if (weaponItem != null) {
-                player.getInventory().setItemInMainHand(weaponItem);
-            }
-        }
-
-        // 发放盔甲
-        String[] armorSlots = {"helmet", "chestplate", "leggings", "boots"};
-        org.bukkit.inventory.EquipmentSlot[] equipmentSlots = {
-                org.bukkit.inventory.EquipmentSlot.HEAD,
-                org.bukkit.inventory.EquipmentSlot.CHEST,
-                org.bukkit.inventory.EquipmentSlot.LEGS,
-                org.bukkit.inventory.EquipmentSlot.FEET
-        };
-
-        for (int i = 0; i < armorSlots.length; i++) {
-            String part = armorSlots[i];
-            if (config.contains(configPath + "." + part)) {
-                String armorConfig = config.getString(configPath + "." + part);
-                ItemStack armorItem = parseItem(armorConfig);
-                if (armorItem != null) {
-                    player.getEquipment().setItem(equipmentSlots[i], armorItem);
-                }
-            }
-        }
-
-        // 发放其他物品
-        if (config.contains(configPath + ".items")) {
-            for (String itemConfig : config.getStringList(configPath + ".items")) {
-                ItemStack item = parseItem(itemConfig);
-                if (item != null) {
-                    player.getInventory().addItem(item);
-                }
-            }
-        }
-    }
-
-    /**
-     * 解析物品配置字符串（格式: 物品类型:数量:附魔1=等级,附魔2=等级）
-     */
-    private ItemStack parseItem(String configStr) {
-        String[] parts = configStr.split(":");
-        if (parts.length < 1) return null;
-
-        // 解析物品类型
-        Material material;
-        try {
-            material = Material.valueOf(parts[0].toUpperCase());
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("无效物品类型: " + parts[0]);
-            return null;
-        }
-
-        // 解析数量
-        int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-        ItemStack item = new ItemStack(material, amount);
-
-        // 解析附魔
-        if (parts.length > 2) {
-            String[] enchants = parts[2].split(",");
-            for (String ench : enchants) {
-                String[] enchParts = ench.split("=");
-                if (enchParts.length == 2) {
-                    try {
-                        Enchantment enchantment = Enchantment.getByKey(
-                                NamespacedKey.minecraft(enchParts[0].toLowerCase())
-                        );
-                        int level = Integer.parseInt(enchParts[1]);
-                        if (enchantment != null) {
-                            item.addUnsafeEnchantment(enchantment, level);
-                        }
-                    } catch (Exception ex) {
-                        plugin.getLogger().warning("无效附魔配置: " + ench + "（物品: " + configStr + "）");
-                    }
-                }
-            }
-        }
-
-        return item;
-    }
-
-    /**
      * 给予复活装备（hunter_resupply配置）
      */
     private void giveResupplyItems(Player player) {
@@ -1376,3 +1258,4 @@ public class StartGame implements Listener {
     }
 
 }
+

@@ -1,4 +1,4 @@
-package com.huntergame.Gui;
+package com.huntergame.gui;
 
 import com.huntergame.HunterGame;
 import org.bukkit.Bukkit;
@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.SkullMeta;
@@ -25,6 +26,10 @@ public class SpectatorGUI implements Listener {
      * 设置旁观者的传送头像（仅操作 9~35 格）
      */
     public void updateSpectatorInventory(Player spectator) {
+        if (spectator == null || !spectator.isOnline() || spectator.getGameMode() != GameMode.SPECTATOR) {
+            return;
+        }
+
         // 只对真正的旁观者更新背包
         if (!plugin.isRealSpectator(spectator.getUniqueId())) {
             return;
@@ -50,7 +55,8 @@ public class SpectatorGUI implements Listener {
             SkullMeta meta = (SkullMeta) head.getItemMeta();
             if (meta != null) {
                 meta.setOwningPlayer(p);
-                meta.setDisplayName("§e点击观看：§a" + p.getName());
+                meta.setDisplayName(plugin.getMessage("spectator_head_display_name", "&e点击观看：&a%player%")
+                        .replace("%player%", p.getName()));
                 head.setItemMeta(meta);
             }
 
@@ -59,6 +65,15 @@ public class SpectatorGUI implements Listener {
         }
 
         spectator.updateInventory();
+    }
+
+    /**
+     * 刷新所有真实旁观者的传送头像。
+     */
+    public void updateAllSpectatorInventories() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            updateSpectatorInventory(player);
+        }
     }
 
     /**
@@ -72,6 +87,14 @@ public class SpectatorGUI implements Listener {
         player.updateInventory();
     }
 
+    public void clearAllSpectatorSlots() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getGameMode() == GameMode.SPECTATOR) {
+                clearSpectatorSlots(player);
+            }
+        }
+    }
+
     /**
      * 当玩家切换游戏模式
      */
@@ -79,6 +102,13 @@ public class SpectatorGUI implements Listener {
     public void onGamemodeChange(PlayerGameModeChangeEvent event) {
         Player player = event.getPlayer();
         GameMode newMode = event.getNewGameMode();
+        boolean wasRealSpectator = plugin.isRealSpectator(player.getUniqueId());
+
+        Bukkit.getScheduler().runTaskLater(
+                plugin,
+                this::updateAllSpectatorInventories,
+                1
+        );
 
         // ---- 进入旁观者 ----
         if (newMode == GameMode.SPECTATOR) {
@@ -90,7 +120,7 @@ public class SpectatorGUI implements Listener {
             );
         }
         // ---- 离开旁观者 ----
-        else if (player.getGameMode() == GameMode.SPECTATOR && newMode != GameMode.SPECTATOR) {
+        else if (player.getGameMode() == GameMode.SPECTATOR && newMode != GameMode.SPECTATOR && wasRealSpectator) {
             // 离开时，只把 9-35 格的头像清空，0-8 格不动
             Bukkit.getScheduler().runTaskLater(
                     plugin,
@@ -98,6 +128,15 @@ public class SpectatorGUI implements Listener {
                     1
             );
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Bukkit.getScheduler().runTaskLater(
+                plugin,
+                this::updateAllSpectatorInventories,
+                1
+        );
     }
 
     /**
@@ -129,12 +168,14 @@ public class SpectatorGUI implements Listener {
 
         Player target = meta.getOwningPlayer().getPlayer();
         if (target == null || !target.isOnline()) {
-            spectator.sendMessage("§c玩家已离线！");
+            spectator.sendMessage(plugin.getMessage("spectator_target_offline", "&c玩家已离线！"));
             return;
         }
 
         // 只传送，不设置观看目标
         spectator.teleport(target.getLocation());
-        spectator.sendMessage("§a已传送到 §e" + target.getName() + " §a附近");
+        spectator.sendMessage(plugin.getMessage("spectator_teleported_to_player", "&a已传送到 &e%player% &a附近")
+                .replace("%player%", target.getName()));
     }
 }
+

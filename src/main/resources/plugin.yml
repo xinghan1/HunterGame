@@ -11,11 +11,11 @@ softdepend:
 commands:
   huntergame:
     description: "HunterGame 插件指令"
-    permission: "huntergame.reload"  # 设定一个默认的权限（可根据需要修改）
+    permission: "huntergame.help"
     usage: ""
   hg:
     description: "HunterGame 缩写指令"
-    permission: "huntergame.reload"
+    permission: "huntergame.help"
     usage: ""
     subcommands:
       setlobby:
@@ -35,6 +35,27 @@ commands:
 
 
 permissions:
+  huntergame.help:
+    description: "允许玩家查看 HunterGame 帮助"
+    default: true
+  huntergame.setlobby:
+    description: "允许玩家设置 HunterGame 大厅"
+    default: op
+  huntergame.startgame:
+    description: "允许玩家强制开始 HunterGame"
+    default: op
   huntergame.reload:
     description: "允许玩家重载 HunterGame 配置"
+    default: op
+  huntergame.newseason:
+    description: "允许玩家开启新赛季"
+    default: op
+  huntergame.refreshtier:
+    description: "允许玩家刷新全服排名"
+    default: op
+  huntergame.saveprofession:
+    description: "允许玩家保存终章职业配置"
+    default: op
+  huntergame.editprofession:
+    description: "允许玩家编辑终章职业物品"
     default: op

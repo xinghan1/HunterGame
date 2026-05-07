@@ -1,0 +1,248 @@
+id: hunter_lurk
+display_name: 影刃
+enabled: true
+icon: NETHERITE_SWORD
+slot: 2
+max_per_team: 1
+max_health: 20.0
+role: hunter
+skill: 隐身
+potion_effects: []
+lore:
+- '&f生命值: &c20.0'
+- '&f技能: %skill%'
+- '&7手持工具+右键，获得20秒隐身,力量II'
+- '&7抗性III,免疫火焰,并隐藏装备'
+- ''
+- '&6&l装备详细:'
+- '&7钻石头盔，钻石胸甲，钻石护腿，钻石靴子'
+- '&7下界合金剑，下界合金斧，下界合金镐，弩'
+- '&7水桶，圆石，末影珍珠，金苹果x3，附魔金苹果'
+- '&7虚弱箭x64，牛排x32，床，末地水晶，风弹，虚弱药水x3'
+- '&7岩浆桶'
+- ''
+- '&f当前选择: &a%selected%&f/&c%limit%'
+- '&a点击选择'
+equipment:
+  helmet:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_HELMET
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 2
+        repair-cost: 1
+  chestplate:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_CHESTPLATE
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 2
+        repair-cost: 1
+  leggings:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_LEGGINGS
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 2
+        repair-cost: 1
+  boots:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_BOOTS
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:feather_falling: 3
+          minecraft:protection: 2
+        repair-cost: 1
+items:
+  '0':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: NETHERITE_SWORD
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:fire_aspect: 2
+          minecraft:sharpness: 6
+        repair-cost: 7
+  '1':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: NETHERITE_AXE
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:sharpness: 6
+        repair-cost: 1
+  '2':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: NETHERITE_PICKAXE
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:efficiency: 3
+        repair-cost: 1
+  '3':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: CROSSBOW
+      meta:
+        ==: ItemMeta
+        meta-type: CROSSBOW
+        enchants:
+          minecraft:flame: 1
+          minecraft:multishot: 1
+          minecraft:punch: 2
+          minecraft:quick_charge: 4
+        repair-cost: 15
+  '4':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: WATER_BUCKET
+  '5':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '6':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ENDER_PEARL
+      amount: 16
+  '7':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: GOLDEN_APPLE
+      amount: 3
+  '8':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ENCHANTED_GOLDEN_APPLE
+  '18':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '19':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '20':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '21':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '22':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '23':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '27':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: TIPPED_ARROW
+      amount: 64
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:weakness
+  '28':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COOKED_BEEF
+      amount: 32
+  '29':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: RED_BED
+  '30':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: END_CRYSTAL
+  '31':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: WIND_CHARGE
+      amount: 64
+  '32':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:weakness
+  '33':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:weakness
+  '34':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:weakness
+  '35':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: LAVA_BUCKET

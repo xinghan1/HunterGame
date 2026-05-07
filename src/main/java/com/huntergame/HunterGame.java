@@ -1,32 +1,45 @@
 package com.huntergame;
 
-import com.huntergame.Gui.GuideGUI;
-import com.huntergame.Gui.SpectatorGUI;
+import com.huntergame.gui.GuideGUI;
+import com.huntergame.gui.SpectatorGUI;
 import com.xigua.baseAPI.BaseAPI;
-import com.huntergame.Message.MessageBroadcaster;
-import com.huntergame.Motd.MOTDListener;
-import com.huntergame.Rank.RankManager;
-import com.huntergame.Rank.SeasonManager;
-import com.huntergame.command.SetCommand;
+import com.huntergame.message.MessageBroadcaster;
+import com.huntergame.motd.MotdListener;
+import com.huntergame.rank.RankManager;
+import com.huntergame.rank.SeasonManager;
+import com.huntergame.command.HunterGameCommand;
+import com.huntergame.combat.LastDamageTracker;
 import com.huntergame.config.PluginConfigFile;
 import com.huntergame.data.DataStorageManager;
-import com.huntergame.effect.EffectManager;
+import com.huntergame.game.CageManager;
+import com.huntergame.game.EscaperQuitCountdown;
 import com.huntergame.game.GameSettlement;
 import com.huntergame.game.StartGame;
 import com.huntergame.inventory.SharedBackpackManager;
 import com.huntergame.listener.ChatActivityListener;
 import com.huntergame.listener.CustomEntityListener;
-import com.huntergame.listener.GameListener;
+import com.huntergame.listener.DeathMessageListener;
+import com.huntergame.listener.DragonFightListener;
+import com.huntergame.listener.GameDeathListener;
 import com.huntergame.listener.HunterRespawnListener;
+import com.huntergame.listener.InactivityMonitor;
 import com.huntergame.listener.NoDamageListener;
-import com.huntergame.papi.HunterGamePlaceholder;
+import com.huntergame.listener.PlayerConnectionListener;
+import com.huntergame.listener.ServerSelectorListener;
+import com.huntergame.listener.WaitingLobbyListener;
+import com.huntergame.placeholder.HunterGamePlaceholder;
 import com.huntergame.portal.EndPortalTracker;
+import com.huntergame.profession.FinalBattleProfessionManager;
+import com.huntergame.reward.GameRewardService;
+import com.huntergame.role.RoleSelectionHandler;
 import com.huntergame.scoreboard.HunterScoreboardManager;
-import com.huntergame.skill.ExplosiveCrossbowListener;
-import com.huntergame.skill.FreezeSkill;
+import com.huntergame.session.DisconnectProtectionService;
 import com.huntergame.skill.SkillManager;
+import com.huntergame.skill.skills.ExplosiveCrossbowListener;
+import com.huntergame.skill.skills.FreezeSkill;
 import com.huntergame.spectator.SpectatorService;
-import com.huntergame.votesystem.VoteSystem;
+import com.huntergame.tracking.HunterTracker;
+import com.huntergame.vote.VoteSystem;
 import com.huntergame.world.*;
 import org.bukkit.*;
 import org.bukkit.command.Command;
@@ -42,10 +55,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class HunterGame extends JavaPlugin implements Listener {
@@ -56,7 +68,7 @@ public class HunterGame extends JavaPlugin implements Listener {
     private Location lobbyLocation;
     private boolean gameInProgress = false; // 是否开始
     private boolean gameEnded = false; // 是否结束
-    final Set<Player> playersWithoutRole = new HashSet<>(); // 记录未选择角色的玩家
+    private final Set<Player> playersWithoutRole = new HashSet<>(); // 记录未选择角色的玩家
     private final Set<UUID> realSpectators = new HashSet<>(); // 记录真正的旁观者（猎人复活中和选择旁观者角色）
     private PluginConfigFile languageConfigFile;
     private PluginConfigFile guiConfigFile;
@@ -64,13 +76,13 @@ public class HunterGame extends JavaPlugin implements Listener {
     private SpectatorService spectatorService;
     private EndPortalTracker endPortalTracker;
     HunterScoreboardManager scoreboardManager;
-    private SetCommand setCommand;
-    public GlassCageManager glassCageManager;
+    private HunterGameCommand setCommand;
+    public CageManager glassCageManager;
     public DamageProtection damageprotection;
     private long startTime = 0;
-    private DisconnectProtection disconnectProtection;
+    private DisconnectProtectionService disconnectProtection;
     private int timeLimitTaskId = -1;
-    private InactivityDetection inactivityDetection;
+    private InactivityMonitor inactivityDetection;
     private StartGame startGameCommand;
     HunterTracker hunterTracker;
     private SeasonManager seasonManager;
@@ -81,22 +93,28 @@ public class HunterGame extends JavaPlugin implements Listener {
     private OreMultiplier oreMultiplier;
     private ExplosiveCrossbowListener explosiveCrossbowListener;
     private GameSettlement gameSettlement;
-    private GameRewards gameRewards;
-    private GameListener gameListener;
+    private GameRewardService gameRewards;
+    private EscaperQuitCountdown escaperQuitCountdown;
+    private LastDamageTracker lastDamageTracker;
     private MessageBroadcaster messageBroadcaster;
     private RankManager rankManager;
     private GuideGUI guideManager;
     private DataStorageManager dataStorageManager;
     private HunterGamePlaceholder hunterGamePlaceholder;
     private SpectatorGUI spectatorGUI;
+    private FinalBattleProfessionManager finalBattleProfessionManager;
+    private OnlineWorldResetManager onlineWorldResetManager;
 
-    public static final int MODE_SKILL_BATTLE = 1;
     public static final int MODE_FINAL_BATTLE = 2;
     public static final int MODE_VANILLA_HUNTER = 3;
+    private static final int FINAL_BATTLE_GLOWING_REFRESH_TICKS = 20 * 5;
+    private static final int FINAL_BATTLE_GLOWING_DURATION_TICKS = 20 * 8;
     private int currentBattleType = 0;
     private int currentGameMode = 0; // 当前游戏模式
     private boolean serverClosing = false;  // 标志服务器是否正在关闭
-    private EffectManager effectManager;
+    private boolean resetScheduled = false;
+    private boolean resetInProgress = false;
+    private boolean settlementStarted = false;
 
     private BaseAPI baseAPI;
     @Override
@@ -141,27 +159,30 @@ public class HunterGame extends JavaPlugin implements Listener {
     private void initializeManagers() {
         skillManager = new SkillManager(this);
         endProtector = new EndWorldProtector(this);
-        setCommand = new SetCommand(this);
+        setCommand = new HunterGameCommand(this);
         dataStorageManager = new DataStorageManager(this);
         sharedBackpackManager = new SharedBackpackManager(this);
         spectatorService = new SpectatorService(this);
         endPortalTracker = new EndPortalTracker(this);
         scoreboardManager = new HunterScoreboardManager(this);
-        glassCageManager = new GlassCageManager(this);
+        glassCageManager = new CageManager(this);
         damageprotection = new DamageProtection(this);
-        disconnectProtection = new DisconnectProtection(this);
+        disconnectProtection = new DisconnectProtectionService(this);
 
         long inactivityKickTime = getConfig().getLong("game.kickTime", 10) * 60 * 1000;
-        inactivityDetection = new InactivityDetection(this, inactivityKickTime);
+        inactivityDetection = new InactivityMonitor(this, inactivityKickTime);
 
         freezeSkill = new FreezeSkill(this);
         explosiveCrossbowListener = new ExplosiveCrossbowListener(this);
         endermanLimiter = new EndermanLimiter(this);
         gameSettlement = new GameSettlement(this);
-        gameRewards = new GameRewards(this);
+        gameRewards = new GameRewardService(this);
+        escaperQuitCountdown = new EscaperQuitCountdown(this);
+        lastDamageTracker = new LastDamageTracker(this);
         rankManager = new RankManager(this);
-        effectManager = new EffectManager(this);
         hunterGamePlaceholder = new HunterGamePlaceholder(this);
+        finalBattleProfessionManager = new FinalBattleProfessionManager(this);
+        onlineWorldResetManager = new OnlineWorldResetManager(this);
         messageBroadcaster = new MessageBroadcaster(this);
         seasonManager = new SeasonManager(this, rankManager, dataStorageManager);
         guideManager = new GuideGUI(this);
@@ -169,7 +190,6 @@ public class HunterGame extends JavaPlugin implements Listener {
 
     private void registerRepeatingTasks() {
         Bukkit.getScheduler().runTaskTimer(this, this::updateScoreboards, 20L, 20L);
-
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             if (isGameRunning()) {
                 for (Player hunter : getHunters()) {
@@ -186,14 +206,15 @@ public class HunterGame extends JavaPlugin implements Listener {
             }
         }, 40L, 40L);
 
-        Bukkit.getScheduler().runTaskTimer(this, this::refreshNightVision, 0L, 20L * 30);
+        Bukkit.getScheduler().runTaskTimer(this, this::refreshNightVision, 0L, 20L * 10);
+        Bukkit.getScheduler().runTaskTimer(this, this::refreshFinalBattleEscaperGlowing, 0L, FINAL_BATTLE_GLOWING_REFRESH_TICKS);
     }
 
     private void updateScoreboards() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!gameInProgress) {
                 scoreboardManager.updateWaitingBoard(player);
-            } else if (isFinalBattleMode() || isVanillaHunterMode()) {
+            } else if (isFinalBattleMode()) {
                 scoreboardManager.updateFinalBattleBoard(player);
             } else {
                 scoreboardManager.updateGameBoard(player);
@@ -206,9 +227,26 @@ public class HunterGame extends JavaPlugin implements Listener {
             return;
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
-            PotionEffect current = player.getPotionEffect(PotionEffectType.NIGHT_VISION);
-            if (current == null || current.getDuration() < 20 * 15) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 20 * 45, 0, false, false));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 20 * 45, 0, false, false));
+        }
+    }
+
+    private void refreshFinalBattleEscaperGlowing() {
+        if (!isGameRunning() || !isFinalBattleMode()) {
+            return;
+        }
+
+        PotionEffect glowing = new PotionEffect(
+                PotionEffectType.GLOWING,
+                FINAL_BATTLE_GLOWING_DURATION_TICKS,
+                0,
+                false,
+                false
+        );
+
+        for (Player escaper : getEscapers()) {
+            if (escaper != null && escaper.isOnline() && escaper.getGameMode() != GameMode.SPECTATOR) {
+                escaper.addPotionEffect(glowing, true);
             }
         }
     }
@@ -226,12 +264,6 @@ public class HunterGame extends JavaPlugin implements Listener {
     public void onDisable() {
         if (messageBroadcaster != null) {
             messageBroadcaster.stopBroadcasting();
-        }
-        if (gameRewards != null) {
-            gameRewards.stopGameRewardTask();
-        }
-        if (effectManager != null) {
-            effectManager.stopEnhancementTask();
         }
         if (disconnectProtection != null) {
             disconnectProtection.cleanup();
@@ -252,41 +284,6 @@ public class HunterGame extends JavaPlugin implements Listener {
             dataStorageManager.shutdown();
         }
         cancelTimeLimitTask();
-
-        // 关服时删除世界文件夹，下次启动自动重新生成
-        if (getConfig().getBoolean("game.reset_worlds_on_shutdown", true)) {
-            deleteWorldFolder("world");
-            deleteWorldFolder("world_nether");
-            deleteWorldFolder("world_the_end");
-        }
-    }
-
-    /**
-     * 删除指定世界文件夹（关服时调用，服务器重启后自动重新生成）
-     */
-    private void deleteWorldFolder(String worldName) {
-        File worldFolder = new File(Bukkit.getWorldContainer(), worldName);
-        if (worldFolder.exists() && worldFolder.isDirectory()) {
-            if (deleteDirectory(worldFolder)) {
-                getLogger().info("已删除世界文件夹: " + worldName);
-            } else {
-                getLogger().warning("删除世界文件夹失败: " + worldName);
-            }
-        }
-    }
-
-    private boolean deleteDirectory(File dir) {
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    deleteDirectory(file);
-                } else {
-                    file.delete();
-                }
-            }
-        }
-        return dir.delete();
     }
 
     /**
@@ -299,26 +296,28 @@ public class HunterGame extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // 将所有的命令交给 SetCommand 处理
         return setCommand.onCommand(sender, command, label, args);
     }
 
     private void registerCommandsAndEvents() {
-        // 注册监听器
         registerEvent(this);
         registerEvent(new ChatActivityListener(this, inactivityDetection));
-        registerEvent(new DeathMessages(this));
+        registerEvent(lastDamageTracker);
+        registerEvent(new DeathMessageListener(this));
         registerEvent(new RoleSelectionHandler(this, disconnectProtection));
         registerEvent(hunterGamePlaceholder);
-        gameListener = new GameListener(this);
-        registerEvent(gameListener);
+        ServerSelectorListener serverSelectorListener = new ServerSelectorListener(this);
+        registerEvent(new PlayerConnectionListener(this, escaperQuitCountdown, serverSelectorListener));
+        registerEvent(serverSelectorListener);
+        registerEvent(new WaitingLobbyListener(this));
+        registerEvent(new GameDeathListener(this));
+        registerEvent(new DragonFightListener(this));
         startGameCommand = new StartGame(this);
         registerEvent(startGameCommand);
         registerEvent(new NoDamageListener(this));
-        hunterTracker = new HunterTracker(this); // 初始化 HunterTracker 并传入主插件实例
-        registerEvent(hunterTracker); // 注册事件监听器
+        hunterTracker = new HunterTracker(this);
+        registerEvent(hunterTracker);
         registerEvent(new CustomEntityListener(this));
-        registerEvent(gameRewards);
         registerEvent(sharedBackpackManager);
         registerCommand("huntergame");
         registerCommand("hg");
@@ -327,15 +326,16 @@ public class HunterGame extends JavaPlugin implements Listener {
         registerEvent(skillManager);
         registerEvent(freezeSkill);
         registerEvent(explosiveCrossbowListener);
-        registerEvent(effectManager);
         registerEvent(gameSettlement);
-        registerEvent(new MOTDListener(this));
+        registerEvent(finalBattleProfessionManager);
+        registerEvent(new MotdListener(this));
         spectatorGUI = new SpectatorGUI(this);
         registerEvent(spectatorGUI);
 
+        // 如果不是原版猎人模式，则触发
         if (!isVanillaHunterMode()) {
             oreMultiplier = new OreMultiplier(this); // 启用 3 倍矿石生成
-        } // 如果不是原版猎人模式，则触发
+        }
 
     }
 
@@ -350,6 +350,7 @@ public class HunterGame extends JavaPlugin implements Listener {
             return;
         }
         pluginCommand.setExecutor(setCommand);
+        pluginCommand.setTabCompleter(setCommand);
     }
 
     // 设置游戏模式
@@ -374,8 +375,6 @@ public class HunterGame extends JavaPlugin implements Listener {
     }
     // 检查是否处于原版猎人模式
     public boolean isVanillaHunterMode() {return currentGameMode == MODE_VANILLA_HUNTER;}
-    // 检测是否处于技能之战
-    public boolean isSkillHunterMode() {return currentGameMode == MODE_SKILL_BATTLE;}
     public HunterTracker getHunterTracker() {
         return hunterTracker;
     }
@@ -403,14 +402,20 @@ public class HunterGame extends JavaPlugin implements Listener {
     public ExplosiveCrossbowListener getExplosiveCrossbowListener() {
         return explosiveCrossbowListener;
     }
-    public GameRewards getGameRewards() {
+    public GameRewardService getGameRewardService() {
         return gameRewards;
     }
-    public GameListener getGameListener() {
-        return gameListener;
+    public EscaperQuitCountdown getEscaperQuitCountdown() {
+        return escaperQuitCountdown;
+    }
+    public LastDamageTracker getLastDamageTracker() {
+        return lastDamageTracker;
     }
     public SeasonManager getSeasonManager() {
         return seasonManager;
+    }
+    public FinalBattleProfessionManager getFinalBattleProfessionManager() {
+        return finalBattleProfessionManager;
     }
     public void setGameInProgress(boolean status) {
         gameInProgress = status;
@@ -424,8 +429,22 @@ public class HunterGame extends JavaPlugin implements Listener {
     public boolean isServerClosing() {
         return serverClosing;
     }
+    public boolean isResetting() {return resetInProgress || (onlineWorldResetManager != null && onlineWorldResetManager.isResetting());}
+    public void setResetInProgress(boolean resetInProgress) {
+        this.resetInProgress = resetInProgress;
+    }
+    public boolean beginSettlement() {
+        if (settlementStarted || resetScheduled || resetInProgress) {
+            return false;
+        }
+
+        settlementStarted = true;
+        gameEnded = true;
+        setGameInProgress(false);
+        cancelTimeLimitTask();
+        return true;
+    }
     public GuideGUI getGuideManager() {return guideManager;}
-    public EffectManager getEffect() {return effectManager;}
     // 设置战役类型
     public void setBattleType(int type) {
         this.currentBattleType = type;
@@ -434,7 +453,7 @@ public class HunterGame extends JavaPlugin implements Listener {
     public int getBattleType() {
         return currentBattleType;
     }
-    // 判断是否为持久战
+    // 判断是否为生存战
     public boolean isPersistenceBattle() {
         return currentBattleType == VoteSystem.TYPE_PERSISTENCE;
     }
@@ -453,8 +472,11 @@ public class HunterGame extends JavaPlugin implements Listener {
         if (scoreboardManager != null) {
             scoreboardManager.reload();
         }
-        if (effectManager != null) {
-            effectManager.reloadConfig();
+        if (skillManager != null) {
+            skillManager.reloadSkillConfig();
+        }
+        if (finalBattleProfessionManager != null) {
+            finalBattleProfessionManager.reload();
         }
         saveConfig();
         getLogger().info("HunterGame 配置文件已重载!");
@@ -491,13 +513,18 @@ public class HunterGame extends JavaPlugin implements Listener {
         escapers.remove(playerId);
     }
     public void addEscaper(UUID playerId) {
+        hunters.remove(playerId);
         escapers.add(playerId);
+        setRoleTags(playerId, false, true);
     }
     public void removeHunter(UUID playerId) {
         hunters.remove(playerId);
     }
     public void addHunter(UUID playerId) {
+        escapers.remove(playerId);
+        deathescapers.remove(playerId);
         hunters.add(playerId);
+        setRoleTags(playerId, true, false);
     }
     public void removeDeathescapers(UUID playerId) {
         deathescapers.remove(playerId);
@@ -506,10 +533,20 @@ public class HunterGame extends JavaPlugin implements Listener {
         deathescapers.add(playerId);
     }
 
+    private void setRoleTags(UUID playerId, boolean hunter, boolean escaper) {
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null) {
+            return;
+        }
+        player.getPersistentDataContainer().set(RoleSelectionHandler.IS_HUNTER, PersistentDataType.BOOLEAN, hunter);
+        player.getPersistentDataContainer().set(RoleSelectionHandler.IS_ESCAPER, PersistentDataType.BOOLEAN, escaper);
+    }
+
     public void clearGameData() {
         escapers.clear();
         hunters.clear();
         deathescapers.clear();
+        playersWithoutRole.clear();
         realSpectators.clear(); // 清理旁观者标记
         if (endPortalTracker != null) {
             endPortalTracker.reset();
@@ -517,7 +554,26 @@ public class HunterGame extends JavaPlugin implements Listener {
         if (startGameCommand != null) {
             startGameCommand.clearFinalBattleRespawnData();
         }
+        if (finalBattleProfessionManager != null) {
+            finalBattleProfessionManager.resetSelections();
+        }
+        if (dataStorageManager != null) {
+            dataStorageManager.resetKillCache();
+        }
+        if (lastDamageTracker != null) {
+            lastDamageTracker.reset();
+        }
 
+    }
+
+    public void addPlayerWithoutRole(Player player) {
+        playersWithoutRole.add(player);
+    }
+    public void removePlayerWithoutRole(Player player) {
+        playersWithoutRole.remove(player);
+    }
+    public boolean isPlayerWithoutRole(Player player) {
+        return playersWithoutRole.contains(player);
     }
 
     /**
@@ -545,11 +601,9 @@ public class HunterGame extends JavaPlugin implements Listener {
     public boolean isRealSpectator(UUID playerId) {
         return realSpectators.contains(playerId);
     }
-
     public List<Player> getHunters() {
         return getOnlinePlayers(hunters);
     }
-
     public List<Player> getEscapers() {
         return getOnlinePlayers(escapers);
     }
@@ -624,7 +678,7 @@ public class HunterGame extends JavaPlugin implements Listener {
     public Location getLobbySpawnLocation() {
         World lobbyWorld = getLobbyWorld();
         if (lobbyWorld == null) {
-            getLogger().warning("大厅世界未加载，返回默认世界出生点");
+            getLogger().warning("大厅世界未加载");
             return Bukkit.getWorlds().get(0).getSpawnLocation();
         }
 
@@ -642,8 +696,36 @@ public class HunterGame extends JavaPlugin implements Listener {
         return guiConfigFile.getConfig();
     }
 
+    public FileConfiguration getLanguageConfig() {
+        return languageConfigFile.getConfig();
+    }
+
+    public void saveLanguageConfig() {
+        languageConfigFile.save();
+    }
+
     public String getMessage(String key, String defaultValue) {
         return languageConfigFile.getTranslatedString(key, defaultValue);
+    }
+
+    public List<String> getMessageList(String key, List<String> defaultValues) {
+        List<String> defaults = defaultValues == null ? Collections.emptyList() : defaultValues;
+        FileConfiguration config = languageConfigFile.getConfig();
+        if (!config.isList(key)) {
+            config.set(key, defaults);
+            languageConfigFile.save();
+        }
+
+        List<String> values = config.getStringList(key);
+        if (values.isEmpty() && !defaults.isEmpty()) {
+            values = defaults;
+        }
+
+        List<String> translated = new ArrayList<>();
+        for (String value : values) {
+            translated.add(ChatColor.translateAlternateColorCodes('&', value));
+        }
+        return translated;
     }
 
     private int gameTime = 300;
@@ -669,11 +751,9 @@ public class HunterGame extends JavaPlugin implements Listener {
     public boolean isHunterSharedBackpack(ItemStack item) {
         return sharedBackpackManager.isHunterBackpack(item);
     }
-
     public boolean isEscaperSharedBackpack(ItemStack item) {
         return sharedBackpackManager.isEscaperBackpack(item);
     }
-
     public Location findAndSetNearestEndPortal(Player player, int radius) {
         return endPortalTracker.findAndSetNearestEndPortal(player, radius);
     }
@@ -703,36 +783,84 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
     }
 
-    // 延迟关闭服务器方法
+    // 游戏结束后在线重置，不再重启服务器
     public void resetGame() {
-        gameEnded = true;
-        setGameInProgress(false);
-        setServerClosing(true); // 标记服务器正在关闭
-        getGameSettlement().showGameEndStats(); // 游戏结算
-        endGame();
-        int delaySeconds = getConfig().getInt("game.end_delay", 10);
-        Bukkit.broadcastMessage(ChatColor.RED + "游戏结束！");
-        Bukkit.broadcastMessage(ChatColor.RED + "服务器将在 " + delaySeconds + " 秒后重启...");
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.setGameMode(GameMode.ADVENTURE);
+        if (resetScheduled || resetInProgress) {
+            return;
+        }
+        if (!settlementStarted && !beginSettlement()) {
+            return;
         }
 
-        clearGameData();
-        String server = getConfig().getString("BungeeCord.server_lobby", "lobby");
+        resetScheduled = true;
+        setServerClosing(true); // 游戏结束到地图重置完成前，禁止新玩家进入
+        getGameSettlement().showGameEndStats(); // 游戏结算
+        endGame();
+        int delaySeconds = getConfig().getInt("game.end_delay", 15);
+        Bukkit.broadcastMessage(getMessage("reset_scheduled", "&c服务器将在 %seconds% 秒后在线重置地图...")
+                .replace("%seconds%", String.valueOf(delaySeconds)));
+
         Bukkit.getScheduler().runTaskLater(this, () -> {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (player.isOnline() && player.isValid()) {
-                    player.sendMessage("§a正在传送至大厅...");
-                    String command = "Connect\0" + server;
-                    byte[] messageData = command.getBytes(StandardCharsets.UTF_8);
-                    player.sendPluginMessage(this, "BungeeCord", messageData);
-                }
+            if (onlineWorldResetManager != null) {
+                onlineWorldResetManager.startReset();
+            } else {
+                prepareForOnlineWorldReset();
+                completeOnlineWorldReset();
             }
         }, 20L * delaySeconds);
+    }
 
-        // 延迟指定秒数后关闭服务器
-        Bukkit.getScheduler().runTaskLater(this, () -> Bukkit.getServer().shutdown(), 20L * delaySeconds + 20L);
+    public void prepareForOnlineWorldReset() {
+        endGame();
+        clearGameData();
+        if (escaperQuitCountdown != null) {
+            escaperQuitCountdown.cancelSilently();
+        }
+        if (startGameCommand != null) {
+            startGameCommand.resetRuntimeData();
+        }
+        if (skillManager != null) {
+            skillManager.resetAllRuntimeData();
+        }
+        if (sharedBackpackManager != null) {
+            sharedBackpackManager.clearBackpacks();
+        }
+        if (spectatorGUI != null) {
+            spectatorGUI.clearAllSpectatorSlots();
+        }
+        if (glassCageManager != null) {
+            glassCageManager.cleanup();
+        }
+        if (disconnectProtection != null) {
+            disconnectProtection.clearAllData();
+        }
+        if (gameSettlement != null) {
+            gameSettlement.resetStats();
+        }
+        if (gameRewards != null) {
+            gameRewards.resetSettlementRewards();
+        }
+        if (oreMultiplier != null) {
+            oreMultiplier.stop();
+        }
+    }
+
+    public void completeOnlineWorldReset() {
+        currentGameMode = 0;
+        currentBattleType = 0;
+        startTime = 0;
+        gameEnded = false;
+        gameInProgress = false;
+        resetScheduled = false;
+        resetInProgress = false;
+        settlementStarted = false;
+        setServerClosing(false);
+        loadConfig();
+        WorldBorderManager.setupWorldBorder();
+        if (oreMultiplier != null) {
+            oreMultiplier.start();
+        }
+        getLogger().info("游戏状态和战斗数据已清理，服务器回到等待状态。");
     }
 
     @EventHandler
@@ -759,8 +887,21 @@ public class HunterGame extends JavaPlugin implements Listener {
 
     public void startGame() {
         gameEnded = false;
+        settlementStarted = false;
         gameInProgress = true;
         startTime = System.currentTimeMillis();
+        if (dataStorageManager != null) {
+            dataStorageManager.resetKillCache();
+        }
+        if (gameSettlement != null) {
+            gameSettlement.resetStats();
+        }
+        if (lastDamageTracker != null) {
+            lastDamageTracker.reset();
+        }
+        if (gameRewards != null) {
+            gameRewards.resetSettlementRewards();
+        }
         startTimeLimitCheck();
     }
 
@@ -788,7 +929,6 @@ public class HunterGame extends JavaPlugin implements Listener {
         return (System.currentTimeMillis() - startTime) / 1000;
     }
 
-
     private void startTimeLimitCheck() {
         cancelTimeLimitTask();
         timeLimitTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(
@@ -798,12 +938,10 @@ public class HunterGame extends JavaPlugin implements Listener {
 
                     long timeLimit;
 
-                    // 持久战逻辑：时间到 -> 逃生者胜利
+                    // 生存战逻辑：时间到 -> 逃生者胜利
                     if (isPersistenceBattle()) {
                         int minutes;
-                        if (isSkillHunterMode()) {
-                            minutes = getConfig().getInt("game.persistence_modes.skill_battle_minutes", 20);
-                        } else if (isFinalBattleMode()) {
+                        if (isFinalBattleMode()) {
                             minutes = getConfig().getInt("game.persistence_modes.final_battle_minutes", 10);
                         } else {
                             minutes = getConfig().getInt("game.persistence_modes.vanilla_hunter_minutes", 25);
@@ -812,17 +950,15 @@ public class HunterGame extends JavaPlugin implements Listener {
 
                         long elapsed = System.currentTimeMillis() - startTime;
                         if (elapsed >= timeLimit) {
-                            forceEndGamePersistence(); // 持久战时间到
+                            forceEndGamePersistence(); // 生存战时间到
                         }
                     }
                     // 通关战逻辑：时间到 -> 猎人胜利
                     else {
                         if (isFinalBattleMode()) {
                             timeLimit = 25 * 60 * 1000L;
-                        } else if (isVanillaHunterMode()) {
-                            timeLimit = 4 * 60 * 60 * 1000L;
                         } else {
-                            timeLimit = 2 * 60 * 60 * 1000L;
+                            timeLimit = 3 * 60 * 60 * 1000L;
                         }
 
                         long elapsed = System.currentTimeMillis() - startTime;
@@ -842,23 +978,34 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
     }
 
-    // 持久战时间结束：逃生者胜利
+    // 生存战时间结束：逃生者胜利
     private void forceEndGamePersistence() {
-        if (!gameInProgress) return;
-        gameInProgress = false;
+        if (!gameInProgress || !beginSettlement()) return;
 
-        Bukkit.broadcastMessage(ChatColor.GOLD + "时间已到，逃生者成功存活！逃生者胜利！");
-        cancelTimeLimitTask();
+        Bukkit.broadcastMessage(getMessage("persistence_time_up_escapers_win", "&6时间已到，逃生者成功存活！逃生者胜利！"));
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            getDataStorageManager().saveTotalWins(player.getUniqueId(), player);
+            UUID playerId = player.getUniqueId();
+            if (gameRewards.hasSettlementReward(playerId)) {
+                continue;
+            }
+
+            getDataStorageManager().saveTotalWins(playerId, player);
             // 逃生者胜利
-            if (isEscaper(player.getUniqueId()) || isDeathescapers(player.getUniqueId())) {
-                player.sendTitle(ChatColor.GREEN + "生存成功", ChatColor.WHITE + "你们坚持到了最后！", 10, 100, 20);
+            if (isEscaper(playerId) || isDeathescapers(playerId)) {
+                player.sendTitle(
+                        getMessage("persistence_escaper_victory_title", "&a生存成功"),
+                        getMessage("persistence_escaper_victory_subtitle", "&f你们坚持到了最后！"),
+                        10, 100, 20
+                );
                 gameRewards.giveEscaperReward(player);
-                getDataStorageManager().addEscapeWin(player.getUniqueId(), player);
+                getDataStorageManager().addEscapeWin(playerId, player);
             } else {
-                player.sendTitle(ChatColor.RED + "时间耗尽", ChatColor.WHITE + "你追杀失败了...", 10, 100, 20);
+                player.sendTitle(
+                        getMessage("persistence_hunter_fail_title", "&c时间耗尽"),
+                        getMessage("persistence_hunter_fail_subtitle", "&f你追杀失败了..."),
+                        10, 100, 20
+                );
                 gameRewards.giveHunterFailReward(player);
             }
         }
@@ -867,41 +1014,35 @@ public class HunterGame extends JavaPlugin implements Listener {
 
     // 通关战时间结束：猎人胜利
     private void forceEndGameClearance() {
-        if (!gameInProgress) return;
-        gameInProgress = false;
-        Bukkit.broadcastMessage(ChatColor.GOLD + "游戏时间耗尽，猎人胜利！");
-
-        cancelTimeLimitTask();
+        if (!gameInProgress || !beginSettlement()) return;
+        Bukkit.broadcastMessage(getMessage("clearance_time_up_hunters_win", "&6游戏时间耗尽，猎人胜利！"));
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            getDataStorageManager().saveTotalWins(player.getUniqueId(), player);
-            if (isEscaper(player.getUniqueId()) || isDeathescapers(player.getUniqueId())) {
+            UUID playerId = player.getUniqueId();
+            if (gameRewards.hasSettlementReward(playerId)) {
+                continue;
+            }
+
+            getDataStorageManager().saveTotalWins(playerId, player);
+            if (isEscaper(playerId) || isDeathescapers(playerId)) {
                 player.sendTitle(
-                        ChatColor.RED + "时间耗尽",
-                        ChatColor.WHITE + "你未能击败末影龙",
+                        getMessage("clearance_escaper_fail_title", "&c时间耗尽"),
+                        getMessage("clearance_escaper_fail_subtitle", "&f你未能击败末影龙"),
                         10, 100, 20
                 );
                 gameRewards.giveEscaperFailReward(player);
             } else {
                 player.sendTitle(
-                        ChatColor.GREEN + "时间耗尽",
-                        ChatColor.WHITE + "你成功守住了胜利",
+                        getMessage("clearance_hunter_victory_title", "&a时间耗尽"),
+                        getMessage("clearance_hunter_victory_subtitle", "&f你成功守住了胜利"),
                         10, 100, 20
                 );
-                getDataStorageManager().addHunterWin(player.getUniqueId(), player);
+                getDataStorageManager().addHunterWin(playerId, player);
                 gameRewards.giveHunterReward(player);
             }
         }
-
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-                getDataStorageManager().saveTotalWins(onlinePlayer.getUniqueId(), onlinePlayer);
-            }
-            Bukkit.shutdown();
-        }, 20L * 15);
         resetGame();
     }
-
 
     // 恢复饱食度
     private void startHungerRegenerationTask() {
@@ -924,8 +1065,4 @@ public class HunterGame extends JavaPlugin implements Listener {
     public BaseAPI getBaseAPI() {
         return baseAPI;
     }
-
-
-
-
 }

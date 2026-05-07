@@ -1,9 +1,8 @@
-package com.huntergame.Gui;
+package com.huntergame.gui;
 
 import com.huntergame.HunterGame;
-import com.huntergame.HunterTracker;
+import com.huntergame.tracking.HunterTracker;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -17,18 +16,18 @@ public class TrackingGUI {
     /**
      * 打开猎人追踪操作 GUI
      */
-    public static void openTrackingGUI(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 9, "选择操作");
+    public static void openTrackingGUI(HunterGame plugin, Player player) {
+        Inventory gui = Bukkit.createInventory(null, 9, plugin.getMessage("tracking_gui_title", "选择操作"));
 
         ItemStack teleportItem = new ItemStack(Material.ENDER_PEARL);
         ItemMeta teleportMeta = teleportItem.getItemMeta();
-        teleportMeta.setDisplayName(ChatColor.GREEN + "传送到队友");
+        teleportMeta.setDisplayName(plugin.getMessage("tracking_gui_teleport_item", "&a传送到队友"));
         teleportItem.setItemMeta(teleportMeta);
         gui.setItem(0, teleportItem);
 
         ItemStack switchTrackingItem = new ItemStack(Material.COMPASS);
         ItemMeta switchTrackingMeta = switchTrackingItem.getItemMeta();
-        switchTrackingMeta.setDisplayName(ChatColor.YELLOW + "切换指南针目标");
+        switchTrackingMeta.setDisplayName(plugin.getMessage("tracking_gui_switch_item", "&e切换指南针目标"));
         switchTrackingItem.setItemMeta(switchTrackingMeta);
         gui.setItem(1, switchTrackingItem);
 
@@ -39,7 +38,7 @@ public class TrackingGUI {
      * 打开队友列表 GUI
      */
     public static void openTeammateListGUI(HunterGame plugin, HunterTracker tracker, Player player) {
-        Inventory gui = Bukkit.createInventory(null, 9, "选择队友");
+        Inventory gui = Bukkit.createInventory(null, 9, plugin.getMessage("tracking_teammate_gui_title", "选择队友"));
         List<Player> teammates = plugin.getHunters();
         teammates.remove(player); // 列表中移除自己
 
@@ -49,7 +48,8 @@ public class TrackingGUI {
             if (teammate != null && teammate.isOnline() && plugin.isHunter(teammate.getUniqueId())) {
                 ItemStack item = new ItemStack(Material.PLAYER_HEAD);
                 ItemMeta meta = item.getItemMeta();
-                meta.setDisplayName(ChatColor.YELLOW + teammate.getName());
+                meta.setDisplayName(plugin.getMessage("tracking_teammate_item", "&e%player%")
+                        .replace("%player%", teammate.getName()));
                 item.setItemMeta(meta);
                 gui.setItem(slot++, item);
             }

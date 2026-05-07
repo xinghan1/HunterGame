@@ -2,15 +2,11 @@ package com.huntergame.listener;
 
 import com.huntergame.HunterGame;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Blaze;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.entity.WitherSkeleton;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.PiglinBarterEvent;
 import org.bukkit.inventory.ItemStack;
@@ -19,20 +15,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class CustomEntityListener implements Listener {
-
-    private static final Set<Material> GOLD_ORES = Set.of(
-            Material.GOLD_ORE,
-            Material.DEEPSLATE_GOLD_ORE,
-            Material.NETHER_GOLD_ORE
-    );
-    private static final Set<Material> IRON_ORES = Set.of(
-            Material.IRON_ORE,
-            Material.DEEPSLATE_IRON_ORE
-    );
 
     private final HunterGame plugin;
 
@@ -116,45 +101,5 @@ public class CustomEntityListener implements Listener {
         }
     }
 
-
-
-    @EventHandler
-    public void onBlockBreak(BlockBreakEvent event) {
-        if (!plugin.isSkillHunterMode()) {
-            return;
-        }
-        Block block = event.getBlock();
-        Material type = block.getType();
-        Player player = event.getPlayer();
-        ItemStack tool = player.getInventory().getItemInMainHand();
-
-        // 检查矿石类型
-        boolean isGold = GOLD_ORES.contains(type);
-        boolean isIron = IRON_ORES.contains(type);
-
-        if (!isGold && !isIron) return;
-
-        // 精准采集检查
-        if (tool.containsEnchantment(Enchantment.SILK_TOUCH)) return;
-
-        // 取消原版掉落
-        event.setDropItems(false);
-
-        // 确定掉落物
-        Material dropType = isGold ? Material.GOLD_INGOT : Material.IRON_INGOT;
-
-        // 计算时运影响
-        int fortuneLevel = tool.getEnchantmentLevel(Enchantment.FORTUNE);
-        int amount = calculateDropAmount(fortuneLevel);
-
-        // 生成掉落物
-        ItemStack drop = new ItemStack(dropType, amount);
-        block.getWorld().dropItemNaturally(block.getLocation(), drop);
-    }
-
-    private int calculateDropAmount(int fortuneLevel) {
-        if (fortuneLevel <= 0) return 1;
-        return 1 + ThreadLocalRandom.current().nextInt(fortuneLevel + 1);
-    }
-
 }
+

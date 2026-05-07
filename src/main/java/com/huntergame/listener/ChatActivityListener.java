@@ -1,7 +1,7 @@
 package com.huntergame.listener;
 
 import com.huntergame.HunterGame;
-import com.huntergame.InactivityDetection;
+import com.huntergame.listener.InactivityMonitor;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -22,9 +22,9 @@ public class ChatActivityListener implements Listener {
     private static final String[] CHAT_FORMAT_PRIORITY = {"admin", "mvp", "vip", "default"};
 
     private final HunterGame plugin;
-    private final InactivityDetection inactivityDetection;
+    private final InactivityMonitor inactivityDetection;
 
-    public ChatActivityListener(HunterGame plugin, InactivityDetection inactivityDetection) {
+    public ChatActivityListener(HunterGame plugin, InactivityMonitor inactivityDetection) {
         this.plugin = plugin;
         this.inactivityDetection = inactivityDetection;
     }
@@ -121,3 +121,4 @@ public class ChatActivityListener implements Listener {
         }
     }
 }
+

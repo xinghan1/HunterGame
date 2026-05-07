@@ -89,6 +89,9 @@ public class OreMultiplier implements Listener {
     }
 
     private void startWorker() {
+        if (workerTask != null) {
+            return;
+        }
         workerTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             scanPlayerChunksPeriodically();
 
@@ -102,6 +105,10 @@ public class OreMultiplier implements Listener {
                 }
             }
         }, 1L, 1L);
+    }
+
+    public void start() {
+        startWorker();
     }
 
     private void scanPlayerChunksPeriodically() {
@@ -311,3 +318,4 @@ public class OreMultiplier implements Listener {
         }
     }
 }
+

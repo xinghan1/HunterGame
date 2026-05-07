@@ -1,17 +1,15 @@
 package com.huntergame.game;
 
 import com.huntergame.HunterGame;
+import com.huntergame.combat.LastDamageTracker;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.*;
 
@@ -39,11 +37,9 @@ public class GameSettlement implements Listener {
     public Map<UUID, Integer> getKillsMap() {
         return killsMap;
     }
-
     public Map<UUID, Double> getDamageMap() {
         return damageMap;
     }
-
     public Map<UUID, Integer> getDeathsMap() {
         return deathsMap;
     }
@@ -55,30 +51,13 @@ public class GameSettlement implements Listener {
         if (!(event.getEntity() instanceof Player target)) return;
 
         // 获取真正的伤害源头（处理远程武器/投射物）
-        Player realDamager = getRealDamager(event.getDamager());
+        Player realDamager = plugin.getLastDamageTracker().getPlayerDamager(event.getDamager());
         if (realDamager == null) return;
 
         // 记录伤害
         UUID damagerId = realDamager.getUniqueId();
         double damage = event.getFinalDamage();
         damageMap.put(damagerId, damageMap.getOrDefault(damagerId, 0.0) + damage);
-    }
-
-    /** 获取真正的伤害源头（处理投射物情况） */
-    private Player getRealDamager(Entity damager) {
-        // 直接攻击者是玩家
-        if (damager instanceof Player) {
-            return (Player) damager;
-        }
-        // 攻击者是投射物（弓箭、雪球等），寻找发射者
-        else if (damager instanceof Projectile projectile) {
-            ProjectileSource source = projectile.getShooter();
-            if (source instanceof Player) {
-                return (Player) source;
-            }
-        }
-        // 可以扩展其他情况，如生物、陷阱等
-        return null;
     }
 
     /** 记录击杀和死亡 */
@@ -88,20 +67,9 @@ public class GameSettlement implements Listener {
         UUID victimId = victim.getUniqueId();
         deathsMap.put(victimId, deathsMap.getOrDefault(victimId, 0) + 1);
 
-        // 处理直接击杀者
-        Player killer = victim.getKiller();
+        LastDamageTracker.DamageCredit killer = plugin.getLastDamageTracker().getCreditedKiller(victim);
         if (killer != null) {
-            recordKill(killer.getUniqueId());
-            return;
-        }
-
-        // 处理远程击杀（通过最后伤害来源）
-        EntityDamageEvent lastDamage = victim.getLastDamageCause();
-        if (lastDamage instanceof EntityDamageByEntityEvent) {
-            Player realKiller = getRealDamager(((EntityDamageByEntityEvent) lastDamage).getDamager());
-            if (realKiller != null) {
-                recordKill(realKiller.getUniqueId());
-            }
+            recordKill(killer.playerId());
         }
     }
 
@@ -149,14 +117,19 @@ public class GameSettlement implements Listener {
         });
 
         // 输出
-        Bukkit.broadcastMessage("§6§m---------------§e 游戏结算 §6§m---------------");
+        Bukkit.broadcastMessage(plugin.getMessage("game_settlement_header", "&6&m---------------&e 游戏结算 &6&m---------------"));
         int rank = 1;
         for (PlayerStats ps : statsList) {
-            Bukkit.broadcastMessage(String.format(
-                    "§e%d.§a%-12s §7| §f击杀: §c%-3d §7| §f伤害: §c%-6.1f §7| §f死亡: §c%-3d",
-                    rank++, ps.name, ps.kills, ps.damage, ps.deaths
-            ));
+            Bukkit.broadcastMessage(plugin.getMessage("game_settlement_row", "&e%rank%.&a%player% &7| &f击杀: &c%kills% &7| &f伤害: &c%damage% &7| &f死亡: &c%deaths%")
+                    .replace("%rank%", String.valueOf(rank++))
+                    .replace("%player%", ps.name == null ? "Unknown" : ps.name)
+                    .replace("%kills%", String.valueOf(ps.kills))
+                    .replace("%damage%", String.format(Locale.US, "%.1f", ps.damage))
+                    .replace("%deaths%", String.valueOf(ps.deaths)));
         }
-        Bukkit.broadcastMessage("§6§m---------------§e 游戏结算 §6§m---------------");
+
+
+        Bukkit.broadcastMessage(plugin.getMessage("game_settlement_footer", "&6&m---------------&e 游戏结算 &6&m---------------"));
     }
 }
+

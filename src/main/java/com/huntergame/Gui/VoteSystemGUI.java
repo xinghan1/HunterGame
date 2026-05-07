@@ -1,6 +1,6 @@
-package com.huntergame.Gui;
+package com.huntergame.gui;
 
-import com.huntergame.votesystem.VoteSystem;
+import com.huntergame.vote.VoteSystem;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
@@ -31,7 +31,7 @@ public class VoteSystemGUI {
         // 创建GUI
         Inventory gui = Bukkit.createInventory(null, size, title);
 
-        // 1. 添加战役类型物品 (持久战/通关战) - 放在第一行
+        // 1. 添加战役类型物品 (生存战/通关战) - 放在第一行
         voteSystem.addTypeItemsToGUI(gui);
 
         // 2. 添加模式选择物品 - 放在第二行
@@ -47,3 +47,4 @@ public class VoteSystemGUI {
         player.openInventory(gui);
     }
 }
+

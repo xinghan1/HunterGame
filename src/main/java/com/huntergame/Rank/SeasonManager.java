@@ -1,4 +1,4 @@
-package com.huntergame.Rank;
+package com.huntergame.rank;
 
 import com.huntergame.HunterGame;
 import com.huntergame.data.DataStorageManager;
@@ -162,13 +162,19 @@ public class SeasonManager implements Listener {
                                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), formattedCommand)
                         );
                     }
-                    player.sendMessage("§a=====================================");
-                    player.sendMessage("§6         新赛季 '" + currentSeasonId + "' 开始啦！          ");
-                    player.sendMessage("§a-------------------------------------");
-                    player.sendMessage("§a你的上赛季段位为: §6" + rank);
-                    player.sendMessage("§a赛季奖励已自动发放至你的账户！");
-                    player.sendMessage("§a赛季努力冲分，可解锁更高级奖励！");
-                    player.sendMessage("§a=====================================");
+                    for (String line : plugin.getMessageList("season_reward_message", Arrays.asList(
+                            "&a=====================================",
+                            "&6         新赛季 '%season%' 开始啦！          ",
+                            "&a-------------------------------------",
+                            "&a你的上赛季段位为: &6%rank%",
+                            "&a赛季奖励已自动发放至你的账户！",
+                            "&a赛季努力冲分，可解锁更高级奖励！",
+                            "&a====================================="
+                    ))) {
+                        player.sendMessage(line
+                                .replace("%season%", currentSeasonId)
+                                .replace("%rank%", rank));
+                    }
                 } else {
                     plugin.getLogger().warning("玩家 " + player.getName() + " 的段位 " + rank + " 没有配置对应的赛季奖励。");
                 }

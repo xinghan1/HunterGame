@@ -15,7 +15,6 @@ import java.util.Collection;
 public class EndermanLimiter implements Listener {
     private final HunterGame plugin;
     private final int endermanLimit;
-    // 配置：检查间隔（ ticks，20ticks=1秒，默认10秒）
     private final int checkInterval;
     private BukkitTask checkTask;
 
@@ -42,8 +41,6 @@ public class EndermanLimiter implements Listener {
             // 如果已达上限，取消生成
             if (currentCount >= endermanLimit) {
                 event.setCancelled(true);
-                // 可选：调试日志
-                // getLogger().info("阻止末影人生成，当前数量：" + currentCount);
             }
         }
     }
@@ -101,9 +98,6 @@ public class EndermanLimiter implements Listener {
             enderman.remove();
             removed++;
         }
-        // 可选：输出清除日志
-        if (removed > 0) {
-            plugin.getLogger().info("末地清除了 " + removed + " 只末影人，当前数量：" + (countEndermenInEnd(endWorld)));
-        }
     }
 }
+

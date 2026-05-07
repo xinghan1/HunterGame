@@ -1,14 +1,14 @@
-package com.huntergame.Motd;
+package com.huntergame.motd;
 
 import com.huntergame.HunterGame;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.server.ServerListPingEvent;
 
-public class MOTDListener implements Listener {
+public class MotdListener implements Listener {
     private final HunterGame plugin;
 
-    public MOTDListener(HunterGame plugin) {
+    public MotdListener(HunterGame plugin) {
         this.plugin = plugin;
     }
 
@@ -22,7 +22,9 @@ public class MOTDListener implements Listener {
 
     // 获取当前状态对应的MOTD
     public String getCurrentMOTD() {
-        if (plugin.isGameRunning()) {
+        if (plugin.isResetting()) {
+            return plugin.getMessage("motd.resetting", "&c重置中");
+        } else if (plugin.isGameRunning()) {
             return plugin.getMessage("motd.game-running", "&c游戏中");
         } else if (plugin.isGameEnded()) {
             return plugin.getMessage("motd.ended", "&6已结束");
@@ -32,3 +34,4 @@ public class MOTDListener implements Listener {
     }
 
 }
+

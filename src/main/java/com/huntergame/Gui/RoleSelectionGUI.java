@@ -1,7 +1,7 @@
-package com.huntergame.Gui;
+package com.huntergame.gui;
 
 import com.huntergame.HunterGame;
-import com.huntergame.RoleSelectionHandler;
+import com.huntergame.role.RoleSelectionHandler;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -20,7 +20,10 @@ public class RoleSelectionGUI {
      * 打开角色选择界面 (Java 版)
      */
     public static void openRoleSelectionGUI(HunterGame plugin, RoleSelectionHandler handler, Player player) {
-        String guiTitle = plugin.getGuiConfig().getString("join_midway_role-gui.title", RoleSelectionHandler.ROLE_GUI_TITLE);
+        String guiTitle = plugin.getGuiConfig().getString(
+                "join_midway_role-gui.title",
+                "选择你的角色"
+        );
         Inventory gui = Bukkit.createInventory(player, 9, ChatColor.translateAlternateColorCodes('&', guiTitle));
 
         int hunterCount = plugin.getHunters().size();

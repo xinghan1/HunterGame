@@ -26,7 +26,6 @@ public class DamageProtection implements Listener {
             // 执行终章之战特有的逻辑
             return;
         }
-        if (plugin.isVanillaHunterMode()) {return;}  // 如果是原版猎人模式，不处理
 
         // 只处理玩家受到伤害的情况
         Entity victim = event.getEntity();
@@ -59,7 +58,6 @@ public class DamageProtection implements Listener {
             // 执行终章之战特有的逻辑
             return;
         }
-        if (plugin.isVanillaHunterMode()) {return;}  // 如果是原版猎人模式，不处理
 
         // 只处理玩家受到伤害的情况
         if (!(event.getEntity() instanceof Player)) {

@@ -1,0 +1,282 @@
+id: hunter_spearman
+display_name: 长矛手
+enabled: true
+icon: DIAMOND_SWORD
+slot: 10
+max_per_team: 2
+max_health: 20.0
+role: hunter
+skill: '突进'
+potion_effects: []
+lore:
+- '&f生命值: &c20.0'
+- '&f技能: %skill%'
+- '&f手持长矛 + 右键: 延迟0.5秒触发，向前突进'
+- '&c[!]职业平衡调整: &7长矛最大伤害上限30点'
+- ''
+- '&6&l装备详细:'
+- '&7钻石头盔，钻石胸甲，钻石护腿，钻石靴子'
+- '&7钻石长矛，钻石剑，钻石斧，钻石镐，盾牌'
+- '&7迅捷药水x4，金苹果x3，牛肉x32，水桶，脚手架x128'
+- '&7末影珍珠x32，附魔金苹果x1，不死图腾x1，风弹x32'
+- ''
+- '&f当前选择: &a%selected%&f/&c%limit%'
+- '&a点击选择'
+equipment:
+  helmet:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_helmet
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:protection":3}'
+      schema_version: 1
+  chestplate:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_chestplate
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:protection":3}'
+      schema_version: 1
+  leggings:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_leggings
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:protection":3}'
+      schema_version: 1
+  boots:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_boots
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:feather_falling":3,"minecraft:protection":3}'
+      schema_version: 1
+  offhand:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:shield
+      count: 1
+      schema_version: 1
+items:
+  '0':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_sword
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:sharpness":5}'
+      schema_version: 1
+  '1':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_axe
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:sharpness":5}'
+      schema_version: 1
+  '2':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_spear
+      count: 1
+      components:
+        minecraft:repair_cost: '7'
+        minecraft:enchantments: '{"minecraft:lunge":1,"minecraft:sharpness":2}'
+      schema_version: 1
+  '3':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:diamond_pickaxe
+      count: 1
+      components:
+        minecraft:repair_cost: '1'
+        minecraft:enchantments: '{"minecraft:efficiency":5}'
+      schema_version: 1
+  '4':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:water_bucket
+      count: 1
+      schema_version: 1
+  '5':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:ender_pearl
+      count: 16
+      schema_version: 1
+  '6':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:wind_charge
+      count: 32
+      schema_version: 1
+  '7':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:golden_apple
+      count: 3
+      schema_version: 1
+  '8':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:enchanted_golden_apple
+      count: 1
+      schema_version: 1
+  '18':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '19':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '20':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '21':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '22':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '23':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '24':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '25':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '26':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  '27':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:cooked_beef
+      count: 32
+      schema_version: 1
+  '28':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:splash_potion
+      count: 1
+      components:
+        minecraft:potion_contents: '{potion:"minecraft:long_swiftness"}'
+      schema_version: 1
+  '29':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:splash_potion
+      count: 1
+      components:
+        minecraft:potion_contents: '{potion:"minecraft:long_swiftness"}'
+      schema_version: 1
+  '30':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:splash_potion
+      count: 1
+      components:
+        minecraft:potion_contents: '{potion:"minecraft:long_swiftness"}'
+      schema_version: 1
+  '31':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:splash_potion
+      count: 1
+      components:
+        minecraft:potion_contents: '{potion:"minecraft:long_swiftness"}'
+      schema_version: 1
+  '32':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:scaffolding
+      count: 64
+      schema_version: 1
+  '33':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:scaffolding
+      count: 64
+      schema_version: 1
+  '34':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:totem_of_undying
+      count: 1
+      schema_version: 1
+  '35':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      DataVersion: 4671
+      id: minecraft:ender_pearl
+      count: 16
+      schema_version: 1

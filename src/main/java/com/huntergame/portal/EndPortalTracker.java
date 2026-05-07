@@ -142,3 +142,4 @@ public class EndPortalTracker {
         return location.getBlockX() + "," + location.getBlockY() + "," + location.getBlockZ();
     }
 }
+

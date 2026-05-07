@@ -1,15 +1,16 @@
 package com.huntergame.listener;
 
 import com.huntergame.HunterGame;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -31,22 +32,38 @@ public class HunterRespawnListener implements Listener {
         UUID playerId = player.getUniqueId();
         FileConfiguration config = plugin.getConfig();
 
-        // 检查是否为猎人
+        if (!plugin.isGameRunning()) {
+            Location lobbyLocation = plugin.getLobbyLocation();
+            if (lobbyLocation != null) {
+                Bukkit.getScheduler().runTask(plugin, () -> player.teleport(lobbyLocation));
+            }
+            return;
+        }
+
         if (!plugin.isHunter(playerId)) return;
 
-        // 如果游戏未运行，不给装备
-        if (!plugin.isGameRunning()) return;
+        if (plugin.isFinalBattleMode() && plugin.isRealSpectator(playerId)) {
+            return;
+        }
 
-        // 如果玩家正在复活倒计时中，不在这里给装备（会在 respawnPlayer 方法中给）
+        // 如果玩家正在复活倒计时中，不在这里给装备
         if (plugin.getStartGameCommand().isPlayerRespawning(playerId)) return;
 
-        // 延迟2秒后给予装备（用于非倒计时的普通重生，如游戏开始时）
+        // 延迟2秒后给予装备
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            // 如果是终章模式，使用 final_battle.hunter 配置
             if (plugin.isFinalBattleMode()) {
-                giveFinalBattleEquipment(player);
+                plugin.getFinalBattleProfessionManager().giveSelectedProfessionLoadout(player);
                 return;
             }
+
+            ItemStack compass = new ItemStack(Material.COMPASS);
+            ItemMeta meta = compass.getItemMeta();
+            if (meta != null) {
+                meta.setDisplayName(plugin.getMessage("tracking_compass_display_name", "&e追踪指南针(右键打开)"));
+                compass.setItemMeta(meta);
+            }
+            player.getInventory().setItem(0, compass);
+            plugin.giveSharedBackpack(player, true);
 
             // 否则使用 hunter_resupply 配置
             if (!config.getBoolean("hunter_resupply.enable", false)) return;
@@ -67,12 +84,10 @@ public class HunterRespawnListener implements Listener {
 
         // 找到当前游戏时间对应的装备阶段（从后往前找，取最大满足条件的）
         Map<?, ?> currentStage = null;
-        int triggerTime = 0;
         for (Map<?, ?> stage : timeStages) {
             int minTime = stage.containsKey("min_minutes") ? ((Number) stage.get("min_minutes")).intValue() : 0;
             if (gameMinutes >= minTime) {
                 currentStage = stage;
-                triggerTime = minTime;
             }
         }
 
@@ -150,97 +165,7 @@ public class HunterRespawnListener implements Listener {
                     break;
             }
         }
-
     }
 
-    /**
-     * 给予终章模式猎人装备
-     */
-    private void giveFinalBattleEquipment(Player player) {
-        FileConfiguration config = plugin.getConfig();
-        String configPath = "final_battle.hunter";
-
-        // 发放武器
-        if (config.contains(configPath + ".weapon")) {
-            String weapon = config.getString(configPath + ".weapon");
-            ItemStack weaponItem = parseItem(weapon);
-            if (weaponItem != null) {
-                player.getInventory().setItemInMainHand(weaponItem);
-            }
-        }
-
-        // 发放盔甲
-        String[] armorSlots = {"helmet", "chestplate", "leggings", "boots"};
-        EquipmentSlot[] equipmentSlots = {
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        };
-
-        for (int i = 0; i < armorSlots.length; i++) {
-            String part = armorSlots[i];
-            if (config.contains(configPath + "." + part)) {
-                String armorConfig = config.getString(configPath + "." + part);
-                ItemStack armorItem = parseItem(armorConfig);
-                if (armorItem != null) {
-                    player.getEquipment().setItem(equipmentSlots[i], armorItem);
-                }
-            }
-        }
-
-        // 发放其他物品
-        if (config.contains(configPath + ".items")) {
-            for (String itemConfig : config.getStringList(configPath + ".items")) {
-                ItemStack item = parseItem(itemConfig);
-                if (item != null) {
-                    player.getInventory().addItem(item);
-                }
-            }
-        }
-    }
-
-    /**
-     * 解析物品配置字符串（格式: 物品类型:数量:附魔1=等级,附魔2=等级）
-     */
-    private ItemStack parseItem(String configStr) {
-        String[] parts = configStr.split(":");
-        if (parts.length < 1) return null;
-
-        // 解析物品类型
-        Material material;
-        try {
-            material = Material.valueOf(parts[0].toUpperCase());
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("无效物品类型: " + parts[0]);
-            return null;
-        }
-
-        // 解析数量
-        int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-        ItemStack item = new ItemStack(material, amount);
-
-        // 解析附魔
-        if (parts.length > 2) {
-            String[] enchants = parts[2].split(",");
-            for (String ench : enchants) {
-                String[] enchParts = ench.split("=");
-                if (enchParts.length == 2) {
-                    try {
-                        Enchantment enchantment = Enchantment.getByKey(
-                                NamespacedKey.minecraft(enchParts[0].toLowerCase())
-                        );
-                        int level = Integer.parseInt(enchParts[1]);
-                        if (enchantment != null) {
-                            item.addUnsafeEnchantment(enchantment, level);
-                        }
-                    } catch (Exception ex) {
-                        plugin.getLogger().warning("无效附魔配置: " + ench + "（物品: " + configStr + "）");
-                    }
-                }
-            }
-        }
-
-        return item;
-    }
 }
+

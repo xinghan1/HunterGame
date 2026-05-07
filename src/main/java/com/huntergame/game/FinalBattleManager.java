@@ -1,7 +1,7 @@
 package com.huntergame.game;
 
 import com.huntergame.HunterGame;
-import com.huntergame.RoleSelectionHandler;
+import com.huntergame.role.RoleSelectionHandler;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -56,33 +56,40 @@ public class FinalBattleManager implements Listener {
         // 世界准备
         World endWorld = getOrCreateEndWorld();
         if (endWorld == null) {
-            Bukkit.broadcastMessage(ChatColor.RED + "末地世界加载失败！");
+            Bukkit.broadcastMessage(plugin.getMessage("final_battle_end_world_failed", "&c末地世界加载失败！"));
             return;
+        }
+
+        // 开局给予无敌时间
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 35 * 20, 0, false));
         }
         // 传送玩家
         teleportPlayers(endWorld);
-        // 发放装备
-        giveConfiguredEquipment();
+        openProfessionSelection();
         createCagesForAllPlayers();
         // 检查是否已有末影龙
         checkAndModifyExistingDragon(endWorld);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Bukkit.broadcastMessage(ChatColor.GREEN + "===== 终章之战 已启动 =====");
+            Bukkit.broadcastMessage(plugin.getMessage("final_battle_started", "&a===== 终章之战 已启动 ====="));
 
             if (plugin.isPersistenceBattle()) {
                 int minutes = plugin.getConfig().getInt("game.persistence_modes.final_battle_minutes", 15);
-                Bukkit.broadcastMessage(ChatColor.YELLOW + "【持久战模式】");
-                Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：存活 " + minutes + " 分钟 •");
-                Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：阻止逃生者，歼灭战 •");
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_mode_title", "&e【生存战模式】"));
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_escaper_objective", "&7• 逃生者目标：存活 %minutes% 分钟 •")
+                        .replace("%minutes%", String.valueOf(minutes)));
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_hunter_objective", "&7• 猎人目标：阻止逃生者，歼灭战 •"));
             } else {
-                Bukkit.broadcastMessage(ChatColor.RED + "【通关战模式】");
-                Bukkit.broadcastMessage(ChatColor.GRAY + "• 逃生者目标：击杀末影龙 •");
-                Bukkit.broadcastMessage(ChatColor.GRAY + "• 猎人目标：阻止逃生者，歼灭战 •");
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_mode_title", "&c【通关战模式】"));
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_escaper_objective", "&7• 逃生者目标：击杀末影龙 •"));
+                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_hunter_objective", "&7• 猎人目标：阻止逃生者，歼灭战 •"));
             }
 
 
-            Bukkit.broadcastMessage(ChatColor.GRAY + "• 阵营： " + finalBattleEscapers.size() + "名逃生者 vs " + hunters.size() + "名猎人 •");
+            Bukkit.broadcastMessage(plugin.getMessage("final_battle_team_ratio", "&7• 阵营： %escapers%名逃生者 vs %hunters%名猎人 •")
+                    .replace("%escapers%", String.valueOf(finalBattleEscapers.size()))
+                    .replace("%hunters%", String.valueOf(hunters.size())));
 
             for (Player hunter : plugin.getHunters()) {
                 hunter.sendMessage(plugin.getMessage("hunter_identity", "&a你是 &c猎人！"));
@@ -119,16 +126,11 @@ public class FinalBattleManager implements Listener {
         AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
         if (maxHealthAttribute != null) {
             maxHealthAttribute.setBaseValue(400.0); // 设置最大生命值为400
-
-            if (plugin.isPersistenceBattle() && plugin.isFinalBattleMode()) {
-                dragon.setHealth(100.0); // 设置当前生命值为100
-            } else {
-                dragon.setHealth(400.0); // 设置当前生命值为400
-            }
+            dragon.setHealth(400.0); // 设置当前生命值为400
             dragonHealthModified = true;
-
             dragon.getWorld().strikeLightningEffect(dragon.getLocation());
-            Bukkit.broadcastMessage(ChatColor.RED + "末影龙已觉醒！生命值: 400");
+            Bukkit.broadcastMessage(plugin.getMessage("dragon_awakened", "&c末影龙已觉醒！生命值: %health%")
+                    .replace("%health%", "400"));
         }
     }
 
@@ -143,7 +145,7 @@ public class FinalBattleManager implements Listener {
         }
     }
 
-    // ===== 新增：为所有玩家创建屏障 =====
+    // 为所有玩家创建屏障
     private void createCagesForAllPlayers() {
         List<Player> allPlayers = new ArrayList<>(hunters);
         allPlayers.addAll(finalBattleEscapers); // 添加所有逃生者
@@ -187,11 +189,11 @@ public class FinalBattleManager implements Listener {
 
         playerCages.put(player.getUniqueId(), cageBlocks);
 
-        // 根据阵营设置不同消失时间（逃生者20秒，猎人25秒）
-        int totalSeconds = plugin.isEscaper(playerId) ? 20 : 25;
+        // 根据阵营设置不同消失时间（逃生者30秒，猎人35秒）
+        int totalSeconds = plugin.isEscaper(playerId) ? 30 : 35;
         int delayTicks = totalSeconds * 20;
 
-        //显示标题和倒计时
+        // 显示标题和倒计时
         startTitleCountdown(player, totalSeconds);
 
         int taskId = new BukkitRunnable() {
@@ -202,8 +204,8 @@ public class FinalBattleManager implements Listener {
 
                 cancelTitleTask(playerId);
                 player.sendTitle(
-                        ChatColor.GREEN + "游戏已开始！",
-                        ChatColor.WHITE + "",
+                        plugin.getMessage("final_battle_cage_start_title", "&a游戏已开始！"),
+                        plugin.getMessage("final_battle_cage_start_subtitle", ""),
                         10, 40, 10
                 );
             }
@@ -221,6 +223,7 @@ public class FinalBattleManager implements Listener {
             titleTaskIds.remove(playerId);
         }
     }
+
     /**
      * 为单个玩家启动标题倒计时
      */
@@ -229,8 +232,9 @@ public class FinalBattleManager implements Listener {
 
         // 立即显示初始标题
         player.sendTitle(
-                ChatColor.YELLOW + "请注意当前环境是否安全",
-                ChatColor.RED + "准备开始：" + totalSeconds + "秒",
+                plugin.getMessage("final_battle_cage_countdown_title", "&e请注意当前环境是否安全"),
+                plugin.getMessage("final_battle_cage_countdown_subtitle", "&c准备开始：%seconds%秒")
+                        .replace("%seconds%", String.valueOf(totalSeconds)),
                 0, 20, 0
         );
 
@@ -246,8 +250,9 @@ public class FinalBattleManager implements Listener {
                 }
 
                 player.sendTitle(
-                        ChatColor.YELLOW + "请注意当前环境是否安全", // 主标题固定
-                        ChatColor.RED + "准备开始：" + remaining + "秒",
+                        plugin.getMessage("final_battle_cage_countdown_title", "&e请注意当前环境是否安全"),
+                        plugin.getMessage("final_battle_cage_countdown_subtitle", "&c准备开始：%seconds%秒")
+                                .replace("%seconds%", String.valueOf(remaining)),
                         0, 20, 0 // 每次显示1秒
                 );
                 remaining--;
@@ -277,18 +282,18 @@ public class FinalBattleManager implements Listener {
         finalBattleEscapers.clear();
         hunters.clear();
 
-        // 1. 动态获取需要多少名逃生者
+        // 动态获取需要多少名逃生者
         int playerCount = players.size();
         int targetEscaperCount = getTargetEscaperCount(playerCount);
 
-        // 2. 从投票逃生者中选择
+        // 从投票逃生者中选择
         List<Player> escaperCandidates = players.stream()
                 .filter(p -> playerVotes.getOrDefault(p.getUniqueId(), 0) == 1)
                 .collect(Collectors.toList());
 
         Collections.shuffle(escaperCandidates); // 打乱候选人
 
-        // 3. 填充逃生者列表
+        // 填充逃生者列表
         // 先从投票者中选
         while (finalBattleEscapers.size() < targetEscaperCount && !escaperCandidates.isEmpty()) {
             finalBattleEscapers.add(escaperCandidates.remove(0));
@@ -305,7 +310,7 @@ public class FinalBattleManager implements Listener {
             }
         }
 
-        // 4. 其余玩家分配为猎人
+        // 其余玩家分配为猎人
         for (Player p : players) {
             if (!finalBattleEscapers.contains(p)) {
                 hunters.add(p);
@@ -314,7 +319,7 @@ public class FinalBattleManager implements Listener {
             }
         }
 
-        // 5. 初始化逃生者状态
+        // 初始化逃生者状态
         for (Player esc : finalBattleEscapers) {
             plugin.addEscaper(esc.getUniqueId());
             esc.getPersistentDataContainer().set(RoleSelectionHandler.IS_ESCAPER, PersistentDataType.BOOLEAN, true);
@@ -326,7 +331,6 @@ public class FinalBattleManager implements Listener {
         int count = plugin.getConfig().getInt("player_counts.final_battle.scaling.default", 1);
 
         ConfigurationSection thresholds = plugin.getConfig().getConfigurationSection("player_counts.final_battle.scaling.thresholds");
-
         if (thresholds != null) {
             // 获取所有配置的键（例如 "13", "8"），解析为整数
             List<Integer> sortedThresholds = thresholds.getKeys(false).stream()
@@ -349,7 +353,6 @@ public class FinalBattleManager implements Listener {
                 }
             }
         }
-
         return count;
     }
 
@@ -402,133 +405,10 @@ public class FinalBattleManager implements Listener {
         }
     }
 
-    private void giveConfiguredEquipment() {
-        // 逃生者装备
-        for (Player esc : finalBattleEscapers) {
-            givePlayerEquipment(esc, "final_battle.escaper");
-        }
-        // 猎人装备
-        for (Player h : hunters) {
-            givePlayerEquipment(h, "final_battle.hunter");
-        }
-    }
-
-    private void givePlayerEquipment(Player player, String configPath) {
-        player.getInventory().clear(); // 清空背包
-        player.getEquipment().clear(); // 清空已穿戴装备
-
-        // 发放武器
-        if (plugin.getConfig().contains(configPath + ".weapon")) {
-            String weapon = plugin.getConfig().getString(configPath + ".weapon");
-            ItemStack weaponItem = parseItem(weapon); // 解析物品配置
-            if (weaponItem != null) {
-                player.getInventory().setItemInMainHand(weaponItem); // 主手装备武器
-            }
-        }
-
-        // 发放盔甲
-        String[] armorSlots = {"helmet", "chestplate", "leggings", "boots"};
-        EquipmentSlot[] equipmentSlots = {
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        };
-
-        for (int i = 0; i < armorSlots.length; i++) {
-            String part = armorSlots[i];
-            if (plugin.getConfig().contains(configPath + "." + part)) {
-                String armorConfig = plugin.getConfig().getString(configPath + "." + part);
-                ItemStack armorItem = parseItem(armorConfig); // 解析盔甲配置
-                if (armorItem != null) {
-                    // 将盔甲直接穿戴到对应槽位
-                    player.getEquipment().setItem(equipmentSlots[i], armorItem);
-                }
-            }
-        }
-
-        // 发放其他物品
-        if (plugin.getConfig().contains(configPath + ".items")) {
-            for (String itemConfig : plugin.getConfig().getStringList(configPath + ".items")) {
-                ItemStack item = parseItem(itemConfig);
-                if (item != null) {
-                    player.getInventory().addItem(item); // 物品放入背包
-                }
-            }
-        }
-
-        // 应用药水效果
-        if (plugin.getConfig().contains(configPath + ".potion_effects")) {
-            for (String effect : plugin.getConfig().getStringList(configPath + ".potion_effects")) {
-                applyPotionEffect(player, effect);
-            }
-        }
-
-        // 设置最大生命值
-        double maxHealth = plugin.getConfig().getDouble(configPath + ".max_health", 20);
-        player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
-        player.setHealth(maxHealth); // 生命值回满
-    }
-
-    // 解析物品配置字符串（格式: 物品类型:数量:附魔1=等级,附魔2=等级）
-    private ItemStack parseItem(String configStr) {
-        String[] parts = configStr.split(":");
-        if (parts.length < 1) return null;
-
-        // 解析物品类型
-        Material material;
-        try {
-            material = Material.valueOf(parts[0].toUpperCase());
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("无效物品类型: " + parts[0]);
-            return null;
-        }
-
-        // 解析数量
-        int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-        ItemStack item = new ItemStack(material, amount);
-
-        // 解析附魔
-        if (parts.length > 2) {
-            String[] enchants = parts[2].split(",");
-            for (String ench : enchants) {
-                String[] enchParts = ench.split("=");
-                if (enchParts.length == 2) {
-                    try {
-                        // 解析附魔
-                        Enchantment enchantment = Enchantment.getByKey(
-                                NamespacedKey.minecraft(enchParts[0].toLowerCase())
-                        );
-                        int level = Integer.parseInt(enchParts[1]);
-                        if (enchantment != null) {
-                            item.addUnsafeEnchantment(enchantment, level);
-                        }
-                    } catch (Exception ex) {
-                        plugin.getLogger().warning("无效附魔配置: " + ench + "（物品: " + configStr + "）");
-                    }
-                }
-            }
-        }
-
-        return item;
-    }
-
-
-    private void applyPotionEffect(Player p, String effectStr) {
-        // 格式: 效果类型:等级:持续时间(秒)
-        String[] parts = effectStr.split(":");
-        if (parts.length < 3) return;
-
-        PotionEffectType type = PotionEffectType.getByName(parts[0].toUpperCase());
-        if (type == null) return;
-
-        try {
-            int amp = Integer.parseInt(parts[1]) - 1;
-            int duration = Integer.parseInt(parts[2]) * 20;
-            p.addPotionEffect(new PotionEffect(type, duration, amp, true, true));
-        } catch (NumberFormatException e) {
-            plugin.getLogger().warning("无效药水效果: " + effectStr);
-        }
+    private void openProfessionSelection() {
+        List<Player> players = new ArrayList<>(finalBattleEscapers);
+        players.addAll(hunters);
+        plugin.getFinalBattleProfessionManager().startSelection(players);
     }
 
 
@@ -587,3 +467,4 @@ public class FinalBattleManager implements Listener {
                 !head.isLiquid();
     }
 }
+

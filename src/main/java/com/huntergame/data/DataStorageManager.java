@@ -155,12 +155,17 @@ public class DataStorageManager {
     }
 
     public void addKillput(UUID playerId, Player player) {
+        addKillput(playerId, player.getName());
+    }
+
+    public void addKillput(UUID playerId, String playerName) {
         String key = playerId.toString() + ".kills_put";
         int newValue = getValue(playerId, "kills_put") + 1;
 
         if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "kills_put", newValue);
+            updateDatabase(playerId, playerName, "kills_put", newValue);
         } else {
+            fileConfig.set(playerId.toString() + ".name", playerName);
             fileConfig.set(key, newValue);
             saveFileConfig();
         }
@@ -302,6 +307,10 @@ public class DataStorageManager {
      * 增加了对 column 的反引号包裹，防止 rank 等关键字导致语法错误
      */
     private void updateDatabase(UUID uuid, Player player, String column, Object value) {
+        updateDatabase(uuid, player.getName(), column, value);
+    }
+
+    private void updateDatabase(UUID uuid, String playerName, String column, Object value) {
         if (dataSource == null) return;
 
         // 修复 4: 关键点！给 `" + column + "` 增加了反引号包裹
@@ -310,7 +319,7 @@ public class DataStorageManager {
 
         try (Connection conn = getConnection(); PreparedStatement statement = conn.prepareStatement(sql)) {
             statement.setString(1, uuid.toString());
-            statement.setString(2, player.getName());
+            statement.setString(2, playerName);
 
             if (value instanceof Integer) statement.setInt(3, (Integer) value);
             else if (value instanceof Double) statement.setDouble(3, (Double) value);
@@ -318,7 +327,7 @@ public class DataStorageManager {
 
             statement.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().severe("更新数据库失败 for player " + uuid + " (" + player.getName() + ")");
+            plugin.getLogger().severe("更新数据库失败 for player " + uuid + " (" + playerName + ")");
             e.printStackTrace();
         }
     }
@@ -409,3 +418,4 @@ public class DataStorageManager {
         if (dataSource != null && !dataSource.isClosed()) dataSource.close();
     }
 }
+

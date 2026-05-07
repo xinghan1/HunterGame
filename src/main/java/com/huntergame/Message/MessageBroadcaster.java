@@ -1,4 +1,4 @@
-package com.huntergame.Message;
+package com.huntergame.message;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -45,7 +45,6 @@ public class MessageBroadcaster {
         messages.clear();
         List<String> cfgMessages = config.getStringList("broadcast.messages");
         if (cfgMessages.isEmpty()) {
-            // 默认消息
             messages.add(colorize("&a欢迎游玩 &c猎人游戏！"));
         } else {
             for (String msg : cfgMessages) {
@@ -91,15 +90,7 @@ public class MessageBroadcaster {
         broadcastTask.runTaskTimer(plugin, 0, messageInterval * 20L);
     }
 
-    // 动态设置间隔（秒）
-    public void setMessageInterval(int seconds) {
-        if (seconds > 0) {
-            this.messageInterval = seconds;
-            if (broadcastTask != null) {
-                startBroadcasting();
-            }
-        }
-    }
+
 
     public void stopBroadcasting() {
         if (broadcastTask != null) {

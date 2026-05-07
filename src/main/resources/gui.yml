@@ -52,20 +52,7 @@ vote-gui:
   mode-section: # 游戏模式选择区配置
     slot: 12
     items:
-      # 技能之战
       '0':
-        id: 1
-        material: NETHER_STAR
-        name: '&b技能之战'
-        lore:
-        - '&7经典模式 | 猎人可复活'
-        - '&7逃生者：击杀末影龙获胜'
-        - '&7猎人：淘汰所有逃生者'
-        # 播放的音效
-        sound: ENTITY_EXPERIENCE_ORB_PICKUP
-        # 音效音调
-        pitch: 1.2
-      '1':
         id: 3
         material: IRON_INGOT
         name: '&7原版猎人'
@@ -75,7 +62,7 @@ vote-gui:
         - '&7猎人：淘汰所有逃生者'
         sound: ENTITY_EXPERIENCE_ORB_PICKUP
         pitch: 1.0
-      '2':
+      '1':
         id: 2
         material: DRAGON_EGG
         name: '&c终章之战'

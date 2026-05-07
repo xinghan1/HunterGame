@@ -1,4 +1,4 @@
-package com.huntergame.Rank;
+package com.huntergame.rank;
 
 public class Rank {
     private final String name;

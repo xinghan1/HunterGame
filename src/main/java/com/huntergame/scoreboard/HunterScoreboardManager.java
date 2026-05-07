@@ -195,3 +195,4 @@ public class HunterScoreboardManager {
         this.finalBattleStartTime = time;
     }
 }
+
