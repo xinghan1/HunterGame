@@ -8,6 +8,8 @@ depend:
   - PlaceholderAPI
 softdepend:
   - BaseAPI
+libraries:
+  - com.zaxxer:HikariCP:5.0.1
 commands:
   huntergame:
     description: "HunterGame 插件指令"

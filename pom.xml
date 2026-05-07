@@ -74,6 +74,7 @@
           <groupId>com.zaxxer</groupId>
           <artifactId>HikariCP</artifactId>
           <version>5.0.1</version>
+          <scope>provided</scope>
       </dependency>
       <dependency>
           <groupId>me.clip</groupId>
