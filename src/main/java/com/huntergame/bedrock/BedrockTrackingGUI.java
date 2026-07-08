@@ -2,11 +2,10 @@ package com.huntergame.bedrock;
 
 import com.huntergame.HunterGame;
 import com.huntergame.tracking.HunterTracker;
-import com.xigua.baseAPI.BaseAPI;
-import com.xigua.cumulus.form.SimpleForm;
-import org.bukkit.Bukkit;
+import com.huntergame.util.FloodgateSupport;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.geysermc.cumulus.form.SimpleForm;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,10 +13,6 @@ import java.util.List;
 public class BedrockTrackingGUI {
 
     public static void openBedrockTrackingMenu(HunterGame plugin, HunterTracker tracker, Player player) {
-        BaseAPI baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (baseAPI == null) {
-            return;
-        }
         SimpleForm.Builder builder = SimpleForm.builder()
                 .title(plugin.getMessage("bedrock_tracking_title", "猎人追踪器"))
                 .content(plugin.getMessage("bedrock_tracking_content", "请选择操作："))
@@ -46,16 +41,11 @@ public class BedrockTrackingGUI {
                 }
             }.runTask(plugin);
         });
-        baseAPI.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 
     // 基岩版：队友列表
     public static void openBedrockTeammateList(HunterGame plugin, HunterTracker tracker, Player player) {
-        BaseAPI spigotMaster = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (spigotMaster == null) {
-            return;
-        }
-
         List<Player> teammates = plugin.getHunters();
         teammates.remove(player);
 
@@ -73,7 +63,7 @@ public class BedrockTrackingGUI {
         List<Player> validTeammates = new ArrayList<>();
 
         for (Player teammate : teammates) {
-            if (teammate != null && teammate.isOnline() && plugin.isHunter(teammate.getUniqueId())) {
+            if (tracker.isTeleportableHunterTeammate(player, teammate)) {
                 builder.button(plugin.getMessage("bedrock_teammate_button", "&e%player%\n&7点击传送")
                         .replace("%player%", teammate.getName()));
                 validTeammates.add(teammate);
@@ -100,16 +90,16 @@ public class BedrockTrackingGUI {
                         return;
                     }
 
-                    if (target != null && target.isOnline()) {
+                    if (tracker.isTeleportableHunterTeammate(player, target)) {
                         // 调用 Tracker 的公共传送方法，统一逻辑
                         tracker.performTeleport(player, target);
                     } else {
-                        player.sendMessage(plugin.getMessage("Teammate_unavailable", "&c目标不可用"));
+                        tracker.sendTeammateUnavailableMessage(player, target);
                     }
                 }
             }.runTask(plugin);
         });
 
-        spigotMaster.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 }

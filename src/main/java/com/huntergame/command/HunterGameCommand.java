@@ -26,7 +26,8 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
             "newseason",
             "refreshtier",
             "saveprofession",
-            "editprofession"
+            "editprofession",
+            "recipe"
     );
 
     private final HunterGame plugin;
@@ -113,6 +114,22 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
 
                     Player player = (Player) sender;
                     plugin.getFinalBattleProfessionManager().openProfessionItemEditor(player, args[1]);
+                    return true;
+                }
+
+                if (args[0].equalsIgnoreCase("recipe")) {
+                    if (!sender.hasPermission("huntergame.recipeadmin")) {
+                        sender.sendMessage(plugin.getMessage("no_permission", "&c你没有权限执行此命令！"));
+                        return true;
+                    }
+                    if (!(sender instanceof Player)) {
+                        sender.sendMessage(plugin.getMessage("player_only_command", "&c该命令只能由玩家执行。"));
+                        return true;
+                    }
+
+                    Player player = (Player) sender;
+                    String recipeId = args.length >= 2 ? args[1] : null;
+                    plugin.getPermissionRecipeManager().openRecipeEditor(player, recipeId);
                     return true;
                 }
 
@@ -206,6 +223,11 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
             if ("editprofession".equals(subCommand) || "editjob".equals(subCommand)) {
                 return filterByPrefix(plugin.getFinalBattleProfessionManager().getProfessionIds(), args[1]);
             }
+            if ("recipe".equals(subCommand)) {
+                List<String> ids = new ArrayList<>(plugin.getPermissionRecipeManager().getRecipeIds());
+                ids.add("hand_item_id");
+                return filterByPrefix(ids, args[1]);
+            }
         }
 
         if (args.length == 3 && ("saveprofession".equals(subCommand) || "savejob".equals(subCommand))) {
@@ -241,6 +263,8 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
                 return sender.hasPermission("huntergame.saveprofession");
             case "editprofession":
                 return sender.hasPermission("huntergame.editprofession");
+            case "recipe":
+                return sender.hasPermission("huntergame.recipeadmin");
             case "help":
                 return sender.hasPermission("huntergame.help");
             default:
@@ -277,6 +301,7 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
                 "&a/hg refreshtier &b立即刷新全服排名",
                 "&b/hg saveprofession <职业ID> <显示名> &f保存终章职业",
                 "&b/hg editprofession <职业ID> &f编辑终章职业物品",
+                "&b/hg recipe [配方ID] &f编辑权限合成配方",
                 "&e========================"
         );
     }

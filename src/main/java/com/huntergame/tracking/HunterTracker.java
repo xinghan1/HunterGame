@@ -4,13 +4,12 @@ import com.huntergame.HunterGame;
 import com.huntergame.bedrock.BedrockTrackingGUI;
 import com.huntergame.gui.TrackingGUI;
 import com.huntergame.util.BedrockSupport;
-import com.xigua.baseAPI.BaseAPI;
-import com.xigua.baseAPI.api.events.ClientLoadAddonFinishEvent;
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -124,11 +123,11 @@ public class HunterTracker implements Listener {
                         return;
                     }
                     Player teammate = Bukkit.getPlayer(teammateName);
-                    if (teammate != null && plugin.isHunter(teammate.getUniqueId()) && teammate.isOnline()) {
+                    if (isTeleportableHunterTeammate(player, teammate)) {
                         performTeleport(player, teammate);
                         player.closeInventory();
                     } else {
-                        player.sendMessage(plugin.getMessage("Teammate_unavailable", "&c该队友当前不可用！"));
+                        sendTeammateUnavailableMessage(player, teammate);
                         player.closeInventory();
                     }
                 }
@@ -145,14 +144,45 @@ public class HunterTracker implements Listener {
                 .anyMatch(target -> target.getLocation().distanceSquared(player.getLocation()) <= radiusSquared);
     }
 
+
+    public boolean isTeleportableHunterTeammate(Player hunter, Player teammate) {
+        if (hunter == null || teammate == null) {
+            return false;
+        }
+        if (!teammate.isOnline() || teammate.equals(hunter)) {
+            return false;
+        }
+        UUID teammateId = teammate.getUniqueId();
+        if (!plugin.isHunter(teammateId)) {
+            return false;
+        }
+        if (plugin.getStartGameCommand() != null && plugin.getStartGameCommand().isPlayerRespawning(teammateId)) {
+            return false;
+        }
+        return teammate.getGameMode() == GameMode.SURVIVAL;
+    }
+
+    public void sendTeammateUnavailableMessage(Player player, Player teammate) {
+        if (teammate != null && plugin.getStartGameCommand() != null
+                && plugin.getStartGameCommand().isPlayerRespawning(teammate.getUniqueId())) {
+            player.sendMessage(plugin.getMessage("teammate_respawning_unavailable", "&c该队友正在复活，无法传送！"));
+            return;
+        }
+        player.sendMessage(plugin.getMessage("Teammate_unavailable", "&c该队友当前不可用！"));
+    }
+
     public void performTeleport(Player player, Player target) {
+        if (!isTeleportableHunterTeammate(player, target)) {
+            sendTeammateUnavailableMessage(player, target);
+            return;
+        }
+
         player.teleport(target.getLocation());
         player.sendMessage(plugin.getMessage("transferring_teammates", "&a你已传送到队友 " + target.getName() + " 的位置!"));
         double newHealth = player.getHealth() - DEDUCT_HEALTH;
         player.setHealth(Math.max(1, newHealth));
         startCooldown(player);
     }
-
     private void startCooldown(Player player) {
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
     }
@@ -245,21 +275,57 @@ public class HunterTracker implements Listener {
     }
 
     public void assignCompassAndTracking(Player player, boolean isEscaper) {
-        // 先停止任何可能的旧任务
         stopTracking(player.getUniqueId());
+        giveTrackingCompass(player, isEscaper);
+        trackingTeammateStatus.put(player.getUniqueId(), isEscaper);
+        updateTrackingNow(player, isEscaper);
+    }
 
+    private void giveTrackingCompass(Player player, boolean isEscaper) {
+        ItemStack compass = createTrackingCompass(isEscaper);
+        int existingSlot = findCompassSlot(player, isEscaper);
+        if (existingSlot >= 0) {
+            player.getInventory().setItem(existingSlot, compass);
+            return;
+        }
+
+        int targetSlot = isEscaper ? -1 : findHunterCompassSlot(player);
+        if (targetSlot >= 0) {
+            player.getInventory().setItem(targetSlot, compass);
+        } else {
+            player.getInventory().addItem(compass);
+        }
+    }
+
+    private ItemStack createTrackingCompass(boolean isEscaper) {
         ItemStack compass = new ItemStack(Material.COMPASS);
         ItemMeta meta = compass.getItemMeta();
-        meta.setDisplayName(getCompassName(isEscaper));
-        compass.setItemMeta(meta);
-        player.getInventory().addItem(compass);
+        if (meta != null) {
+            meta.setDisplayName(getCompassName(isEscaper));
+            compass.setItemMeta(meta);
+        }
+        return compass;
+    }
 
-        // 【关键】将玩家加入 Map。
-        // 如果是猎人，isEscaper=false。这会让全局任务接管该玩家。
-        // putIfAbsent 保证如果玩家已经切换到"追踪队友(true)"模式，不会被重置回"追踪逃生者(false)"。
-        trackingTeammateStatus.putIfAbsent(player.getUniqueId(), isEscaper);
+    private int findCompassSlot(Player player, boolean isEscaper) {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            if (isCompassFor(contents[slot], isEscaper)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
 
-        updateTrackingNow(player, isEscaper);
+    private int findHunterCompassSlot(Player player) {
+        int[] preferredSlots = {0, 7, 6, 5, 4, 3, 2, 1};
+        for (int slot : preferredSlots) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || item.getType() == Material.AIR) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     @EventHandler
@@ -270,14 +336,43 @@ public class HunterTracker implements Listener {
         }
     }
 
+    @EventHandler
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player)) {
+            return;
+        }
+
+        Player player = (Player) event.getEntity();
+        UUID playerId = player.getUniqueId();
+        ItemStack item = event.getItem().getItemStack();
+
+        if (isCompassFor(item, true) && !plugin.isEscaper(playerId)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        if (isCompassFor(item, false) && !plugin.isHunter(playerId)) {
+            event.setCancelled(true);
+        }
+    }
+
     private boolean isTrackingCompass(ItemStack item) {
+        return isCompassFor(item, false) || isCompassFor(item, true);
+    }
+
+    private boolean isCompassFor(ItemStack item, boolean isEscaper) {
         if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) {
             return false;
         }
 
         ItemMeta meta = item.getItemMeta();
-        return meta.hasDisplayName()
-                && (getCompassName(false).equals(meta.getDisplayName()) || getCompassName(true).equals(meta.getDisplayName()));
+        if (meta == null || !meta.hasDisplayName()) {
+            return false;
+        }
+
+        String displayName = meta.getDisplayName();
+        return getCompassName(isEscaper).equals(displayName)
+                || (!isEscaper && plugin.getMessage("tracking_compass_display_name", "&e追踪指南针(右键打开)").equals(displayName));
     }
 
     private String getCompassName(boolean isEscaper) {
@@ -299,6 +394,12 @@ public class HunterTracker implements Listener {
         } else if (!isEscaper) {
             updateHunterCompassAndActionBar(player);
         }
+    }
+
+    public void startTrackingHunter(Player hunter) {
+        giveTrackingCompass(hunter, false);
+        trackingTeammateStatus.put(hunter.getUniqueId(), false);
+        updateHunterCompassAndActionBar(hunter);
     }
 
     public void startTrackingEscaper(Player escaper) {
@@ -414,7 +515,7 @@ public class HunterTracker implements Listener {
         Player nearest = null;
         double nearestDistance = Double.MAX_VALUE;
         for (Player teammate : plugin.getHunters()) {
-            if (!teammate.equals(hunter) && teammate != null && teammate.isOnline() && teammate.getWorld().equals(hunter.getWorld()) && plugin.isHunter(teammate.getUniqueId()) && teammate.getGameMode() == GameMode.SURVIVAL) {
+            if (isTeleportableHunterTeammate(hunter, teammate) && teammate.getWorld().equals(hunter.getWorld())) {
                 double distanceSquared = hunterLocation.distanceSquared(teammate.getLocation());
                 if (distanceSquared < nearestDistance) {
                     nearestDistance = distanceSquared;

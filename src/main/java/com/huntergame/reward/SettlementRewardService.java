@@ -54,6 +54,7 @@ public final class SettlementRewardService {
 
         dispatchConfiguredCommands(player, role, win, placeholders);
         sendRewardMessage(player, placeholders, current);
+        addGamePlayed(player);
         applyProficiency(player, proficiency);
         return true;
     }
@@ -176,6 +177,13 @@ public final class SettlementRewardService {
             return;
         }
         plugin.getDataStorageManager().addProficiency(player, proficiency);
+    }
+
+    private void addGamePlayed(Player player) {
+        if (plugin.getDataStorageManager() == null) {
+            return;
+        }
+        plugin.getDataStorageManager().addGamePlayed(player.getUniqueId(), player);
     }
 
     private String applyPlaceholders(String text, Map<String, String> placeholders) {

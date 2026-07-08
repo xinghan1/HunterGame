@@ -18,18 +18,22 @@ database:
   table_prefix: "hg_"        # 数据库表前缀
 
 game:
-  reset_worlds_on_shutdown: true  # 备用：关服时是否自动删除世界文件夹重置地图
+  reset_worlds_on_shutdown: true  # 关服时是否自动删除世界文件夹重置地图
+  end_delay: 15        # 游戏结束后多少秒开始关闭服务器并清理地图
   minPlayers: 3        # 最小玩家人数
   countdown: 60        # 倒计时总时间（秒）
-  end_delay: 15        # 游戏结束后多少秒开始在线重置
-  online_reset:
+  custom_recipes:
+    max_uses: 3  # 权限合成配方每名玩家每局最多使用次数
+  shutdown_reset:
     player_kick_delay_ticks: 100  # 发送跨服传送后，等待多少tick再踢出仍留在本服的玩家
-    post_kick_prepare_delay_ticks: 20 # 踢出玩家后等待多少tick再开始清理游戏数据和卸载世界
-    world_step_delay_ticks: 60    # 每个世界重置完成后，等待多少tick再处理下一个世界
-    kick_message: "&c服务器正在重置地图，请稍后再加入"
+    post_kick_prepare_delay_ticks: 20 # 踢出玩家后等待多少tick再开始卸载并删除地图
+    world_step_delay_ticks: 60    # 每个世界目录清理完成后，等待多少tick再处理下一个世界
+    world_retry_times: 5       # 世界卸载/删除失败时最多重试次数
+    world_retry_delay_ticks: 40 # 世界卸载/删除失败后，等待多少tick再重试
     worlds:
       - name: world
         environment: NORMAL
+        preserve_datapacks: true # 保留 world/datapacks 文件夹
       - name: world_nether
         environment: NETHER
       - name: world_the_end
@@ -58,16 +62,25 @@ game:
   hunter_shared_backpack: 90  # 猎人共享背包冷却（秒）
   escaper_shared_backpack: 90  # 逃生者共享背包冷却（秒）
   escaper_tracking_enable: true  # 是否启用逃生者队伍跟踪
-  hunter_respawn_radius: 200  # 猎人复活配置,复活到逃生者附近的随机半径（格）
+  hunter_respawn_radius: 300  # 猎人复活配置,复活到逃生者附近的随机半径（格）
   spectator_max_distance: 100 # 旁观者距离观看目标的最大距离（格），超出自动传送回去
   respawn:
-    baseRespawnTime: 5  # 最小复活时间(秒)
+    baseRespawnTime: 30  # 最小复活时间(秒)
     maxRespawnTime: 180 # 最大复活时间(秒)
     maxGameTime: 3000 # 最大推移时间(秒)  随着游戏时间增加，复活时间而延长
   persistence_modes:   # 生存战各模式获胜所需存活时间（分钟）
     final_battle_minutes: 10
     vanilla_hunter_minutes: 25
-
+  vanilla_hunter:
+    auto_smelt:
+      enabled: true # 经典猎人模式挖矿自动熔炼，精准采集工具不会触发
+    haste:
+      enabled: true # 经典猎人模式中是否定时给予急迫效果
+      duration_seconds: 15 # 每次给予持续时间
+      amplifier: 1 # 0=急迫1，1=急迫2
+    blaze_rod_guarantee:
+      enabled: true # 经典猎人模式玩家击杀烈焰人时，若原版未掉落烈焰棒则保底补发
+      amount: 1 # 保底补发数量
 ore_multiplier:
   player_radius_chunks: 1      # 玩家跨区块时，处理周围多少圈已加载区块
   max_chunks_per_tick: 1       # 每 tick 最多处理几个区块，调高会更快但更吃性能
@@ -334,5 +347,3 @@ final_battle:
   skill_lock_seconds: 40       # 开局多少秒内禁止释放职业技能（0=不限制）
   hunter_max_respawns: 1        # 猎人最大复活次数（0=不复活，1=最多复活1次，以此类推）
   hunter_respawn_seconds: 30    # 猎人复活等待时间（秒）
-
-

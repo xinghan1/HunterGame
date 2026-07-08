@@ -3,6 +3,7 @@ com\huntergame\command\SetLobbyCommand.class
 com\huntergame\bedrock\BedrockVoteSystemGUI$3.class
 com\huntergame\listener\InactivityMonitor.class
 com\huntergame\world\EndWorldProtector.class
+com\huntergame\crafting\PermissionRecipeManager$PermissionRecipe.class
 com\huntergame\vote\VoteSystem$1.class
 com\huntergame\bedrock\BedrockTrackingGUI$2.class
 com\huntergame\listener\DeathMessageListener.class
@@ -33,9 +34,11 @@ com\huntergame\data\DataStorageManager.class
 com\huntergame\skill\skills\BlinkSkill.class
 com\huntergame\spectator\SpectatorService.class
 com\huntergame\message\MessageBroadcaster$1.class
+com\huntergame\crafting\PermissionRecipeManager$RecipeBookHolder.class
 com\huntergame\world\OnlineWorldResetManager.class
 com\huntergame\profession\FinalBattleProfessionManager$ProfessionRole.class
 com\huntergame\skill\skills\DashSkill.class
+com\huntergame\crafting\PermissionRecipeManager$RecipeDetailHolder.class
 com\huntergame\listener\DragonFightListener.class
 com\huntergame\gui\TrackingGUI.class
 com\huntergame\role\RoleSelectionHandler.class
@@ -65,9 +68,11 @@ com\huntergame\skill\skills\TurtleSkill.class
 com\huntergame\skill\skills\WallPhaseSkill.class
 com\huntergame\profession\FinalBattleProfessionManager.class
 com\huntergame\portal\EndPortalTracker$1.class
+com\huntergame\listener\VanillaHunterGameplayListener.class
 com\huntergame\listener\ServerSelectorListener.class
 com\huntergame\listener\WaitingLobbyListener.class
 com\huntergame\skill\skills\KnockbackFieldSkill.class
+com\huntergame\crafting\PermissionRecipeManager.class
 com\huntergame\profession\FinalBattleProfessionManager$Profession.class
 com\huntergame\bedrock\BedrockRoleSelectionGUI$1.class
 com\huntergame\gui\VoteSystemGUI.class
@@ -78,6 +83,7 @@ com\huntergame\bedrock\BedrockVoteSystemGUI$2.class
 com\huntergame\skill\SkillManager.class
 com\huntergame\game\CageManager$1.class
 com\huntergame\command\HunterGameCommand.class
+com\huntergame\listener\FinalBattleHunterAdvancementListener.class
 com\huntergame\world\OnlineWorldResetManager$WorldResetTarget.class
 com\huntergame\game\FinalBattleManager$2.class
 com\huntergame\tracking\HunterTracker.class
@@ -85,6 +91,7 @@ com\huntergame\reward\GameRewardService.class
 com\huntergame\world\EndermanLimiter.class
 com\huntergame\rank\RankManager.class
 com\huntergame\gui\SpectatorGUI.class
+com\huntergame\util\FloodgateSupport.class
 com\huntergame\skill\skills\BlinkSkill$1.class
 com\huntergame\bedrock\BedrockTrackingGUI$1.class
 com\huntergame\game\StartGame$1.class
@@ -106,7 +113,9 @@ com\huntergame\skill\skills\DoubleJumpSkill$1.class
 com\huntergame\skill\skills\FreezeSpellSkill.class
 com\huntergame\skill\skills\FreezeSkill$FreezeData.class
 com\huntergame\skill\skills\WallPhaseSkill$InventorySnapshot.class
+com\huntergame\listener\ChatActivityListener$ChatGroup.class
 com\huntergame\portal\EndPortalTracker.class
+com\huntergame\listener\VanillaHunterGameplayListener$1.class
 com\huntergame\placeholder\HunterGamePlaceholder$2.class
 com\huntergame\skill\skills\ExplosiveCrossbowSkill.class
 com\huntergame\game\GameSettlement$1PlayerStats.class
@@ -115,6 +124,7 @@ com\huntergame\world\OreMultiplier.class
 com\huntergame\bedrock\BedrockGuideGUI.class
 com\huntergame\skill\skills\SkillContext.class
 com\huntergame\skill\skills\SkillActivationResult.class
+com\huntergame\crafting\PermissionRecipeManager$RecipeEditorHolder.class
 com\huntergame\listener\NoDamageListener.class
 com\huntergame\rank\Rank.class
 com\huntergame\placeholder\HunterGamePlaceholder$1.class

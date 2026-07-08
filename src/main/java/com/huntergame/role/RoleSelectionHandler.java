@@ -16,8 +16,6 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -52,13 +50,23 @@ public class RoleSelectionHandler implements Listener {
             return;
         }
 
-        if (plugin.getStartGameCommand().isPlayerRespawning(playerId)) {
+        boolean isRespawning = plugin.getStartGameCommand().isPlayerRespawning(playerId);
+        if (disconnectProtection.hasOfflineProtectionData(playerId)) {
+            disconnectProtection.clearOfflineProtectionData(playerId);
+            plugin.removePlayerWithoutRole(player);
+            player.setGameMode(isRespawning || plugin.isRealSpectator(playerId)
+                    ? GameMode.SPECTATOR
+                    : GameMode.SURVIVAL);
+            return;
+        }
+
+        if (isRespawning) {
             player.setGameMode(GameMode.SPECTATOR);
             return;
         }
 
-        if (disconnectProtection.hasOfflineProtectionData(playerId)) {
-            disconnectProtection.clearOfflineProtectionData(playerId);
+        if (plugin.isHunter(playerId) || plugin.isEscaper(playerId)) {
+            plugin.removePlayerWithoutRole(player);
             player.setGameMode(GameMode.SURVIVAL);
             return;
         }
@@ -152,10 +160,8 @@ public class RoleSelectionHandler implements Listener {
 
         if (event.getSlot() == hunterSlot) {
             selectHunterRole(player, playerId);
-            player.getInventory().clear();
         } else if (showEscaperOption && event.getSlot() == escaperSlot) {
             selectEscaperRole(player, playerId);
-            player.getInventory().clear();
         } else if (event.getSlot() == spectatorSlot) {
             selectSpectatorRole(player);
         }
@@ -171,21 +177,17 @@ public class RoleSelectionHandler implements Listener {
         player.closeInventory();
         // 传送到随机玩家位置
         plugin.teleportSpectatorToRandomPlayer(player);
+        showSpectatorInventoryHint(player);
     }
 
     public void selectHunterRole(Player player, UUID playerId) {
         player.getInventory().clear();
         player.setGameMode(GameMode.SURVIVAL);
+        plugin.removeRealSpectator(playerId);
         plugin.addHunter(playerId);
         plugin.removePlayerWithoutRole(player);
         player.getPersistentDataContainer().set(IS_HUNTER, PersistentDataType.BOOLEAN, true);
         player.getPersistentDataContainer().set(IS_ESCAPER, PersistentDataType.BOOLEAN, false);
-
-        ItemStack compass = new ItemStack(Material.COMPASS);
-        ItemMeta meta = compass.getItemMeta();
-        meta.setDisplayName(plugin.getMessage("tracking_compass_display_name", "&e追踪指南针(右键打开)"));
-        compass.setItemMeta(meta);
-        player.getInventory().setItem(0, compass);
 
 
         player.closeInventory();
@@ -195,17 +197,19 @@ public class RoleSelectionHandler implements Listener {
                         .replace("%escapers%", String.valueOf(plugin.getEscapers().size()))
         );
         teleportNewHunterNearRandomHunter(player);
+        giveMidGameRoleItems(player, true);
 
     }
 
     public void selectEscaperRole(Player player, UUID playerId) {
         player.getInventory().clear();
+        player.setGameMode(GameMode.SURVIVAL);
+        plugin.removeRealSpectator(playerId);
         plugin.addEscaper(playerId);
         plugin.removePlayerWithoutRole(player);
         plugin.getStartGameCommand().giveEscaperMark(player);
         player.getInventory().clear();
         player.setSaturation(20.0F);
-        plugin.getHunterTracker().assignCompassAndTracking(player, true);
         plugin.getEscaperQuitCountdown().cancel();
 
         player.getPersistentDataContainer().set(IS_HUNTER, PersistentDataType.BOOLEAN, false);
@@ -221,9 +225,39 @@ public class RoleSelectionHandler implements Listener {
         );
 
         teleportEscaperToRandomLocation(player);
+        giveMidGameRoleItems(player, false);
     }
 
     // ==========================================================
+
+    private void giveMidGameRoleItems(Player player, boolean hunter) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player == null || !player.isOnline()) {
+                return;
+            }
+
+            UUID playerId = player.getUniqueId();
+            if (hunter) {
+                if (!plugin.isHunter(playerId)) {
+                    return;
+                }
+                plugin.getHunterTracker().startTrackingHunter(player);
+                plugin.giveSharedBackpack(player, true);
+            } else {
+                if (!plugin.isEscaper(playerId)) {
+                    return;
+                }
+                plugin.getHunterTracker().assignCompassAndTracking(player, true);
+                plugin.giveSharedBackpack(player, false);
+            }
+            player.updateInventory();
+        }, 1L);
+    }
+
+    private void showSpectatorInventoryHint(Player player) {
+        String hint = plugin.getMessage("spectator_inventory_hint", "&7打开背包可切换玩家观战");
+        player.sendTitle("", hint, 10, 80, 20);
+    }
 
     private void teleportPlayer(Player player, double x, double z) {
         World world = Bukkit.getWorld("world");

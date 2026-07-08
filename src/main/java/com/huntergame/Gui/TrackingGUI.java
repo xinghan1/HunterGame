@@ -45,7 +45,7 @@ public class TrackingGUI {
         int slot = 0;
         for (Player teammate : teammates) {
             if (slot >= 9) break; // 防止超出格子
-            if (teammate != null && teammate.isOnline() && plugin.isHunter(teammate.getUniqueId())) {
+            if (tracker.isTeleportableHunterTeammate(player, teammate)) {
                 ItemStack item = new ItemStack(Material.PLAYER_HEAD);
                 ItemMeta meta = item.getItemMeta();
                 meta.setDisplayName(plugin.getMessage("tracking_teammate_item", "&e%player%")

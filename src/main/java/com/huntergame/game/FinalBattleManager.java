@@ -101,7 +101,6 @@ public class FinalBattleManager implements Listener {
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.setGameMode(GameMode.SURVIVAL);
-            plugin.getDataStorageManager().addGamePlayed(player.getUniqueId(), player);
         }
     }
 

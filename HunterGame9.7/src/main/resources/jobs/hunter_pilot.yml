@@ -1,0 +1,253 @@
+id: hunter_pilot
+display_name: '&d空降者'
+enabled: true
+icon: ELYTRA
+role: hunter # escaper,hunter,all
+slot: 0
+max_per_team: 1
+max_health: 20.0
+skill: ''
+potion_effects: []
+lore:
+- '&f生命值: &c20.0'
+- '&f技能: %skill%'
+- ''
+- '&6&l装备详细:'
+- '&7铁头盔，钻石甲，铁护腿，铁靴子，鞘翅'
+- '&7重锤，钻石剑，钻石镐，盾牌，弓'
+- '&7床，末地水晶，缓慢药水x3'
+- '&7金苹果x3，牛肉x32，箭x64，水桶，岩浆桶'
+- '&7末影珍珠x16，附魔金苹果x1'
+- ''
+- '&f当前选择: &a%selected%&f/&c%limit%'
+- '&a点击选择'
+equipment:
+  helmet:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: IRON_HELMET
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 4
+        repair-cost: 1
+  chestplate:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ELYTRA
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        Damage: 368
+  leggings:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: IRON_LEGGINGS
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 4
+        repair-cost: 1
+  boots:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: IRON_BOOTS
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:feather_falling: 3
+          minecraft:protection: 4
+        repair-cost: 1
+  offhand:
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_CHESTPLATE
+      meta:
+        ==: ItemMeta
+        meta-type: ARMOR
+        enchants:
+          minecraft:protection: 4
+        repair-cost: 1
+items:
+  '0':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: MACE
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        repair-cost: 3
+  '1':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_SWORD
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:knockback: 1
+          minecraft:sharpness: 4
+        repair-cost: 3
+  '2':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: BOW
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:flame: 1
+          minecraft:power: 5
+          minecraft:punch: 2
+        repair-cost: 7
+  '3':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: DIAMOND_PICKAXE
+      meta:
+        ==: ItemMeta
+        meta-type: UNSPECIFIC
+        enchants:
+          minecraft:efficiency: 3
+        repair-cost: 1
+  '4':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: WATER_BUCKET
+  '5':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: WIND_CHARGE
+      amount: 32
+  '6':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ENDER_PEARL
+      amount: 16
+  '7':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: GOLDEN_APPLE
+      amount: 3
+  '8':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ENCHANTED_GOLDEN_APPLE
+  '9':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: FIREWORK_ROCKET
+      amount: 16
+  '10':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '11':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '12':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '13':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '14':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '15':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COBBLESTONE
+      amount: 64
+  '18':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:strong_slowness
+  '19':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:strong_slowness
+  '20':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: SPLASH_POTION
+      meta:
+        ==: ItemMeta
+        meta-type: POTION
+        potion-type: minecraft:strong_slowness
+  '27':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: COOKED_BEEF
+      amount: 32
+  '28':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: ARROW
+      amount: 64
+  '29':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: TOTEM_OF_UNDYING
+  '30':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: LAVA_BUCKET
+  '34':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: RED_BED
+  '35':
+    item:
+      ==: org.bukkit.inventory.ItemStack
+      v: 3955
+      type: END_CRYSTAL

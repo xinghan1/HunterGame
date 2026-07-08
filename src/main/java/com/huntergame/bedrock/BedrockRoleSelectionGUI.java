@@ -2,12 +2,11 @@ package com.huntergame.bedrock;
 
 import com.huntergame.HunterGame;
 import com.huntergame.role.RoleSelectionHandler;
-import com.xigua.baseAPI.BaseAPI;
-import com.xigua.cumulus.form.SimpleForm;
-import org.bukkit.Bukkit;
+import com.huntergame.util.FloodgateSupport;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.geysermc.cumulus.form.SimpleForm;
 
 import java.util.UUID;
 
@@ -17,11 +16,6 @@ public class BedrockRoleSelectionGUI {
      * 打开基岩版角色选择表单
      */
     public static void openBedrockRoleSelection(HunterGame plugin, RoleSelectionHandler handler, Player player) {
-        BaseAPI baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (baseAPI == null) {
-            return;
-        }
-
         String title = plugin.getGuiConfig().getString(
                 "join_midway_role-gui.title",
                 "选择你的角色"
@@ -82,6 +76,6 @@ public class BedrockRoleSelectionGUI {
             }.runTask(plugin);
         });
 
-        baseAPI.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 }

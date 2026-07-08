@@ -2,7 +2,6 @@ package com.huntergame;
 
 import com.huntergame.gui.GuideGUI;
 import com.huntergame.gui.SpectatorGUI;
-import com.xigua.baseAPI.BaseAPI;
 import com.huntergame.message.MessageBroadcaster;
 import com.huntergame.motd.MotdListener;
 import com.huntergame.rank.RankManager;
@@ -10,6 +9,7 @@ import com.huntergame.rank.SeasonManager;
 import com.huntergame.command.HunterGameCommand;
 import com.huntergame.combat.LastDamageTracker;
 import com.huntergame.config.PluginConfigFile;
+import com.huntergame.crafting.PermissionRecipeManager;
 import com.huntergame.data.DataStorageManager;
 import com.huntergame.game.CageManager;
 import com.huntergame.game.EscaperQuitCountdown;
@@ -20,12 +20,14 @@ import com.huntergame.listener.ChatActivityListener;
 import com.huntergame.listener.CustomEntityListener;
 import com.huntergame.listener.DeathMessageListener;
 import com.huntergame.listener.DragonFightListener;
+import com.huntergame.listener.FinalBattleHunterAdvancementListener;
 import com.huntergame.listener.GameDeathListener;
 import com.huntergame.listener.HunterRespawnListener;
 import com.huntergame.listener.InactivityMonitor;
 import com.huntergame.listener.NoDamageListener;
 import com.huntergame.listener.PlayerConnectionListener;
 import com.huntergame.listener.ServerSelectorListener;
+import com.huntergame.listener.VanillaHunterGameplayListener;
 import com.huntergame.listener.WaitingLobbyListener;
 import com.huntergame.placeholder.HunterGamePlaceholder;
 import com.huntergame.portal.EndPortalTracker;
@@ -104,6 +106,7 @@ public class HunterGame extends JavaPlugin implements Listener {
     private SpectatorGUI spectatorGUI;
     private FinalBattleProfessionManager finalBattleProfessionManager;
     private OnlineWorldResetManager onlineWorldResetManager;
+    private PermissionRecipeManager permissionRecipeManager;
 
     public static final int MODE_FINAL_BATTLE = 2;
     public static final int MODE_VANILLA_HUNTER = 3;
@@ -115,14 +118,21 @@ public class HunterGame extends JavaPlugin implements Listener {
     private boolean resetScheduled = false;
     private boolean resetInProgress = false;
     private boolean settlementStarted = false;
+    private boolean pvpLocked = false;
+    private int completedHotResets = 0;
 
-    private BaseAPI baseAPI;
+    @Override
+    public void onLoad() {
+        OnlineWorldResetManager.cleanupPendingShutdownResets(this);
+    }
+
     @Override
     public void onEnable() {
         initializeOptionalDependencies();
         setupDefaultConfig();
         initializeConfigFiles();
         loadLobbyWorld();
+        loadGameWorlds();
 
         Bukkit.getScheduler().runTaskLater(this, this::loadConfig, 20L * 5);
 
@@ -137,11 +147,16 @@ public class HunterGame extends JavaPlugin implements Listener {
     }
 
     private void initializeOptionalDependencies() {
-        if (Bukkit.getPluginManager().getPlugin("BaseAPI") != null) {
-            baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-            getLogger().info("发现 BaseAPI，将启用基岩版通信！");
+        if (Bukkit.getPluginManager().isPluginEnabled("floodgate")) {
+            getLogger().info("发现 floodgate，将启用基岩版表单！");
         } else {
-            getLogger().warning("未找到 BaseAPI，基岩版通信不可用！");
+            getLogger().info("未找到 floodgate，基岩版表单功能跳过。");
+        }
+
+        if (Bukkit.getPluginManager().isPluginEnabled("BaseAPI")) {
+            getLogger().info("发现 BaseAPI，将启用 BaseAPI 计分板通信！");
+        } else {
+            getLogger().info("未找到 BaseAPI，将使用 Bukkit 计分板。");
         }
     }
 
@@ -182,6 +197,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         rankManager = new RankManager(this);
         hunterGamePlaceholder = new HunterGamePlaceholder(this);
         finalBattleProfessionManager = new FinalBattleProfessionManager(this);
+        permissionRecipeManager = new PermissionRecipeManager(this);
         onlineWorldResetManager = new OnlineWorldResetManager(this);
         messageBroadcaster = new MessageBroadcaster(this);
         seasonManager = new SeasonManager(this, rankManager, dataStorageManager);
@@ -207,6 +223,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         }, 40L, 40L);
 
         Bukkit.getScheduler().runTaskTimer(this, this::refreshNightVision, 0L, 20L * 10);
+        Bukkit.getScheduler().runTaskTimer(this, this::refreshVanillaHunterHaste, 0L, 20L * 10);
         Bukkit.getScheduler().runTaskTimer(this, this::refreshFinalBattleEscaperGlowing, 0L, FINAL_BATTLE_GLOWING_REFRESH_TICKS);
     }
 
@@ -228,6 +245,23 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 20 * 45, 0, false, false));
+        }
+    }
+
+    private void refreshVanillaHunterHaste() {
+        if (!isGameRunning() || !isVanillaHunterMode()
+                || !getConfig().getBoolean("game.vanilla_hunter.haste.enabled", true)) {
+            return;
+        }
+
+        int durationTicks = Math.max(1, getConfig().getInt("game.vanilla_hunter.haste.duration_seconds", 15)) * 20;
+        int amplifier = Math.max(0, getConfig().getInt("game.vanilla_hunter.haste.amplifier", 1));
+        PotionEffect haste = new PotionEffect(PotionEffectType.HASTE, durationTicks, amplifier, false, false);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getGameMode() != GameMode.SPECTATOR) {
+                player.addPotionEffect(haste, true);
+            }
         }
     }
 
@@ -274,6 +308,9 @@ public class HunterGame extends JavaPlugin implements Listener {
         if (endermanLimiter != null) {
             endermanLimiter.stop();
         }
+        if (permissionRecipeManager != null) {
+            permissionRecipeManager.unregisterBukkitRecipes();
+        }
         if (endPortalTracker != null) {
             endPortalTracker.cancelSearch();
         }
@@ -310,15 +347,18 @@ public class HunterGame extends JavaPlugin implements Listener {
         registerEvent(new PlayerConnectionListener(this, escaperQuitCountdown, serverSelectorListener));
         registerEvent(serverSelectorListener);
         registerEvent(new WaitingLobbyListener(this));
+        registerEvent(new FinalBattleHunterAdvancementListener(this));
         registerEvent(new GameDeathListener(this));
         registerEvent(new DragonFightListener(this));
         startGameCommand = new StartGame(this);
         registerEvent(startGameCommand);
         registerEvent(new NoDamageListener(this));
+        registerEvent(new VanillaHunterGameplayListener(this));
         hunterTracker = new HunterTracker(this);
         registerEvent(hunterTracker);
         registerEvent(new CustomEntityListener(this));
         registerEvent(sharedBackpackManager);
+        registerEvent(permissionRecipeManager);
         registerCommand("huntergame");
         registerCommand("hg");
         getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
@@ -417,6 +457,16 @@ public class HunterGame extends JavaPlugin implements Listener {
     public FinalBattleProfessionManager getFinalBattleProfessionManager() {
         return finalBattleProfessionManager;
     }
+    public PermissionRecipeManager getPermissionRecipeManager() {
+        return permissionRecipeManager;
+    }
+    public boolean isPvpLocked() {
+        return pvpLocked;
+    }
+
+    public void setPvpLocked(boolean pvpLocked) {
+        this.pvpLocked = pvpLocked;
+    }
     public void setGameInProgress(boolean status) {
         gameInProgress = status;
     }
@@ -477,6 +527,9 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
         if (finalBattleProfessionManager != null) {
             finalBattleProfessionManager.reload();
+        }
+        if (permissionRecipeManager != null) {
+            permissionRecipeManager.reload();
         }
         saveConfig();
         getLogger().info("HunterGame 配置文件已重载!");
@@ -562,6 +615,9 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
         if (lastDamageTracker != null) {
             lastDamageTracker.reset();
+        }
+        if (permissionRecipeManager != null) {
+            permissionRecipeManager.resetUsageCounts();
         }
 
     }
@@ -655,6 +711,66 @@ public class HunterGame extends JavaPlugin implements Listener {
         }
     }
 
+
+    /**
+     * 启动时预加载游戏世界，避免后续逻辑读取 Bukkit.getWorld(...) 时世界未找到。
+     */
+    private void loadGameWorlds() {
+        loadConfiguredWorld("world", World.Environment.NORMAL);
+        loadConfiguredWorld("world_nether", World.Environment.NETHER);
+        loadConfiguredWorld("world_the_end", World.Environment.THE_END);
+
+        for (Map<?, ?> worldConfig : getConfig().getMapList("game.shutdown_reset.worlds")) {
+            Object nameValue = worldConfig.get("name");
+            if (nameValue == null) {
+                continue;
+            }
+
+            String worldName = String.valueOf(nameValue).trim();
+            if (worldName.isEmpty()) {
+                continue;
+            }
+
+            Object environmentValue = worldConfig.get("environment");
+            String environmentName = environmentValue == null ? "NORMAL" : String.valueOf(environmentValue);
+            loadConfiguredWorld(worldName, parseWorldEnvironment(environmentName));
+        }
+    }
+
+    private void loadConfiguredWorld(String worldName, World.Environment environment) {
+        World world = Bukkit.getWorld(worldName);
+        if (world != null) {
+            getLogger().info("世界 " + worldName + " 已经加载");
+            return;
+        }
+
+        getLogger().info("正在加载世界: " + worldName + " (" + environment + ")");
+
+        WorldCreator creator = new WorldCreator(worldName);
+        creator.environment(environment);
+        creator.generateStructures(true);
+
+        try {
+            world = Bukkit.createWorld(creator);
+            if (world != null) {
+                world.setAutoSave(true);
+                getLogger().info("世界 " + worldName + " 加载成功！");
+            } else {
+                getLogger().warning("世界 " + worldName + " 加载失败！");
+            }
+        } catch (Exception e) {
+            getLogger().severe("加载世界 " + worldName + " 时出错: " + e.getMessage());
+        }
+    }
+
+    private World.Environment parseWorldEnvironment(String environmentName) {
+        try {
+            return World.Environment.valueOf(environmentName.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            getLogger().warning("无效世界环境 " + environmentName + "，已使用 NORMAL。");
+            return World.Environment.NORMAL;
+        }
+    }
     private void updateLobbySpawn(World lobbyWorld) {
         Location spawnLocation = getConfiguredLobbyLocation(lobbyWorld);
         lobbyWorld.setSpawnLocation(spawnLocation);
@@ -797,17 +913,25 @@ public class HunterGame extends JavaPlugin implements Listener {
         getGameSettlement().showGameEndStats(); // 游戏结算
         endGame();
         int delaySeconds = getConfig().getInt("game.end_delay", 15);
-        Bukkit.broadcastMessage(getMessage("reset_scheduled", "&c服务器将在 %seconds% 秒后在线重置地图...")
+        Bukkit.broadcastMessage(getMessage("server_shutdown_scheduled", "&c服务器将在 %seconds% 秒后关闭并重置地图...")
                 .replace("%seconds%", String.valueOf(delaySeconds)));
 
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (onlineWorldResetManager != null) {
                 onlineWorldResetManager.startReset();
             } else {
-                prepareForOnlineWorldReset();
-                completeOnlineWorldReset();
+                Bukkit.shutdown();
             }
         }, 20L * delaySeconds);
+    }
+
+    private boolean shouldShutdownAfterEnd() {
+        int maxHotResets = getConfig().getInt("game.online_reset.shutdown_after_hot_resets", 10);
+        return maxHotResets > 0 && completedHotResets >= maxHotResets;
+    }
+
+    public void recordCompletedHotReset() {
+        completedHotResets++;
     }
 
     public void prepareForOnlineWorldReset() {
@@ -854,6 +978,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         resetScheduled = false;
         resetInProgress = false;
         settlementStarted = false;
+        pvpLocked = false;
         setServerClosing(false);
         loadConfig();
         WorldBorderManager.setupWorldBorder();
@@ -906,6 +1031,7 @@ public class HunterGame extends JavaPlugin implements Listener {
     }
 
     public void endGame() {
+        pvpLocked = false;
         gameInProgress = false;
         cancelTimeLimitTask();
     }
@@ -1062,7 +1188,4 @@ public class HunterGame extends JavaPlugin implements Listener {
         }.runTaskTimer(this, 0L, 20L);
     }
 
-    public BaseAPI getBaseAPI() {
-        return baseAPI;
-    }
 }

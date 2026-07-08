@@ -1,0 +1,42 @@
+# 玩法介绍GUI配置文件
+# GUI基础设置
+gui:
+  size: 27             # 格数（必须是9的倍数：9/18/27/36/45/54）
+
+# 触发物品设置（右键/左键打开GUI的物品）
+trigger-item:
+  material: "BOOK"       # 物品材质
+  trigger-action: "BOTH"  # 触发动作：RIGHT_CLICK/LEFT_CLICK/BOTH
+  forced-slot: 0  # 放在快捷栏第1格
+
+# GUI内展示的物品（玩法介绍内容）
+items:
+  0:
+    slot: 10           # 槽位
+    material: "BOOK"  # 物品材质
+    click-action: "none"  # 点击动作（预留：none/open-submenu等）
+
+  1:  # 第二个物品
+    slot: 11
+    material: "DRAGON_EGG"
+    click-action: "none"
+
+  2:  # 第三个物品
+    slot: 12
+    material: "BOW"
+    click-action: "none"
+
+  3:
+    slot: 13
+    material: "CHEST"
+    click-action: "none"
+
+  4:
+    slot: 14
+    material: "COMPASS"
+    click-action: "none"
+
+  5:
+    slot: 15
+    material: "LIME_WOOL"
+    click-action: "none"

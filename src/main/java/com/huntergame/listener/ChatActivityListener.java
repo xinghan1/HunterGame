@@ -5,7 +5,6 @@ import com.huntergame.listener.InactivityMonitor;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,6 +14,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 
+import java.util.IllegalFormatException;
 import java.util.UUID;
 
 public class ChatActivityListener implements Listener {
@@ -31,30 +31,45 @@ public class ChatActivityListener implements Listener {
 
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
-        if (!plugin.getConfig().getBoolean("formats.enable", false)) {
-            return;
-        }
-
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
         inactivityDetection.updateActivity(player);
 
+        boolean formatsEnabled = plugin.getConfig().getBoolean("formats.enable", false);
+        if (!formatsEnabled && !plugin.isGameRunning()) {
+            return;
+        }
+
+        String message = formatsEnabled
+                ? formatConfiguredMessage(player, event.getMessage())
+                : formatVanillaMessage(event, player);
+
+        event.setCancelled(true);
+        if (!plugin.isGameRunning()) {
+            broadcastToAll(message);
+            return;
+        }
+
+        sendTeamChat(playerId, message);
+    }
+
+    private String formatConfiguredMessage(Player player, String rawMessage) {
         String format = resolveChatFormat(player);
-        format = format.replace("%player%", player.getDisplayName()).replace("%message%", event.getMessage());
+        format = format.replace("%player%", player.getDisplayName()).replace("%message%", rawMessage);
 
         if (plugin.getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             format = PlaceholderAPI.setPlaceholders(player, format);
         }
 
-        format = ChatColor.translateAlternateColorCodes('&', format);
-        event.setCancelled(true);
+        return ChatColor.translateAlternateColorCodes('&', format);
+    }
 
-        if (!plugin.isGameRunning()) {
-            broadcastToAll(format);
-            return;
+    private String formatVanillaMessage(AsyncPlayerChatEvent event, Player player) {
+        try {
+            return String.format(event.getFormat(), player.getDisplayName(), event.getMessage());
+        } catch (IllegalFormatException e) {
+            return "<" + player.getDisplayName() + "> " + event.getMessage();
         }
-
-        sendTeamChat(player, playerId, format);
     }
 
     @EventHandler
@@ -102,23 +117,31 @@ public class ChatActivityListener implements Listener {
         }
     }
 
-    private void sendTeamChat(Player sender, UUID senderId, String message) {
-        boolean senderIsHunter = plugin.isHunter(senderId);
-        boolean senderIsEscaper = plugin.isEscaper(senderId);
-        boolean senderIsSpectator = sender.getGameMode() == GameMode.SPECTATOR;
+    private void sendTeamChat(UUID senderId, String message) {
+        ChatGroup senderGroup = getChatGroup(senderId);
 
         for (Player recipient : Bukkit.getOnlinePlayers()) {
             UUID recipientId = recipient.getUniqueId();
-            boolean recipientIsSpectator = recipient.getGameMode() == GameMode.SPECTATOR;
-
-            if (senderIsSpectator && recipientIsSpectator) {
-                recipient.sendMessage(message);
-            } else if (senderIsHunter && (plugin.isHunter(recipientId) || recipientIsSpectator)) {
-                recipient.sendMessage(message);
-            } else if (senderIsEscaper && (plugin.isEscaper(recipientId) || recipientIsSpectator)) {
+            if (getChatGroup(recipientId) == senderGroup) {
                 recipient.sendMessage(message);
             }
         }
+    }
+
+    private ChatGroup getChatGroup(UUID playerId) {
+        if (plugin.isHunter(playerId)) {
+            return ChatGroup.HUNTER;
+        }
+        if (plugin.isEscaper(playerId)) {
+            return ChatGroup.ESCAPER;
+        }
+        return ChatGroup.SPECTATOR;
+    }
+
+    private enum ChatGroup {
+        HUNTER,
+        ESCAPER,
+        SPECTATOR
     }
 }
 

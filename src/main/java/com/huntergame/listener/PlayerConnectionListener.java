@@ -72,6 +72,7 @@ public class PlayerConnectionListener implements Listener {
                     player.getInventory().clear();
                     serverSelectorListener.giveServerSelector(player);
                     plugin.getGuideManager().giveTriggerItem(player);
+                    plugin.getPermissionRecipeManager().giveWaitingRecipeBook(player);
                 }, 5L);
             } else {
                 player.sendMessage(plugin.getMessage("lobby_not_set", "&c大厅位置未正确设置，请联系管理员！"));
@@ -87,7 +88,10 @@ public class PlayerConnectionListener implements Listener {
         }
 
         event.setJoinMessage(plugin.getMessage("player_join_start", "&a&l[+] &e%player%").replace("%player%", player.getName()));
-        if (plugin.isEscaper(playerId)) {
+        if (plugin.isHunter(playerId)) {
+            plugin.getHunterTracker().startTrackingHunter(player);
+            plugin.giveSharedBackpack(player, true);
+        } else if (plugin.isEscaper(playerId)) {
             plugin.getHunterTracker().startTrackingEscaper(player);
         }
     }
@@ -98,7 +102,11 @@ public class PlayerConnectionListener implements Listener {
         UUID playerId = player.getUniqueId();
 
         plugin.getDataStorageManager().addRank(playerId, player);
-        plugin.removeRealSpectator(playerId);
+        boolean isRespawning = plugin.getStartGameCommand() != null
+                && plugin.getStartGameCommand().isPlayerRespawning(playerId);
+        if (!isRespawning) {
+            plugin.removeRealSpectator(playerId);
+        }
 
         if (plugin.getStartGameCommand() != null && plugin.getStartGameCommand().getVoteSystem() != null) {
             plugin.getStartGameCommand().getVoteSystem().clearPlayerVote(playerId);
@@ -111,7 +119,7 @@ public class PlayerConnectionListener implements Listener {
         if (plugin.isEscaper(playerId)) {
             plugin.removeEscaper(playerId);
         }
-        if (plugin.isHunter(playerId)) {
+        if (plugin.isHunter(playerId) && !isRespawning) {
             plugin.removeHunter(playerId);
         }
 

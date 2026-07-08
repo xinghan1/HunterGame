@@ -1,9 +1,11 @@
+D:\plugin\HunterGame\src\main\java\com\huntergame\listener\VanillaHunterGameplayListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\game\GameSettlement.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\FreezeSkill.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\listener\DragonFightListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\profession\FinalBattleProfessionManager.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\bedrock\BedrockVoteSystemGUI.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\listener\ChatActivityListener.java
+D:\plugin\HunterGame\src\main\java\com\huntergame\util\FloodgateSupport.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\world\EndWorldProtector.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\listener\ServerSelectorListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\data\DataStorageManager.java
@@ -66,11 +68,13 @@ D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\SkillContext.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\game\CageManager.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\LavaWalkerSkill.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\role\RoleSelectionHandler.java
+D:\plugin\HunterGame\src\main\java\com\huntergame\crafting\PermissionRecipeManager.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\reward\GameRewardService.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\gui\TrackingGUI.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\listener\DeathMessageListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\DemolitionExpertSkill.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\combat\LastDamageTracker.java
+D:\plugin\HunterGame\src\main\java\com\huntergame\listener\FinalBattleHunterAdvancementListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\vote\VoteSystem.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\world\EndermanLimiter.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\WallPhaseSkill.java

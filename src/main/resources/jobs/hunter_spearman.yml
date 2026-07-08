@@ -1,9 +1,9 @@
 id: hunter_spearman
-display_name: 长矛手
+display_name: '&b长矛手'
 enabled: true
 icon: DIAMOND_SWORD
 slot: 10
-max_per_team: 2
+max_per_team: 1
 max_health: 20.0
 role: hunter
 skill: '突进'

@@ -7,6 +7,7 @@ description: A Minecraft Hunter Game plugin.
 depend:
   - PlaceholderAPI
 softdepend:
+  - floodgate
   - BaseAPI
 libraries:
   - com.zaxxer:HikariCP:5.0.1
@@ -60,4 +61,7 @@ permissions:
     default: op
   huntergame.editprofession:
     description: "允许玩家编辑终章职业物品"
+    default: op
+  huntergame.recipeadmin:
+    description: "允许玩家编辑权限合成配方"
     default: op

@@ -56,18 +56,12 @@ public class HunterRespawnListener implements Listener {
                 return;
             }
 
-            ItemStack compass = new ItemStack(Material.COMPASS);
-            ItemMeta meta = compass.getItemMeta();
-            if (meta != null) {
-                meta.setDisplayName(plugin.getMessage("tracking_compass_display_name", "&e追踪指南针(右键打开)"));
-                compass.setItemMeta(meta);
-            }
-            player.getInventory().setItem(0, compass);
-            plugin.giveSharedBackpack(player, true);
-
             // 否则使用 hunter_resupply 配置
-            if (!config.getBoolean("hunter_resupply.enable", false)) return;
-            giveResupplyItems(player);
+            if (config.getBoolean("hunter_resupply.enable", false)) {
+                giveResupplyItems(player);
+            }
+            plugin.getHunterTracker().startTrackingHunter(player);
+            plugin.giveSharedBackpack(player, true);
         }, 40L); // 40 ticks = 2秒
     }
 

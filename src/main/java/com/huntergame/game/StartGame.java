@@ -18,7 +18,6 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -41,7 +40,6 @@ public class StartGame implements Listener {
     private final Map<UUID, Integer> respawnTimers = new HashMap<>(); // 存储玩家 UUID 和剩余复活时间
     private final Map<UUID, BukkitRunnable> respawnTasks = new HashMap<>(); // 存储玩家 UUID 和复活任务
     private final Map<UUID, Integer> finalBattleHunterRespawns = new HashMap<>();
-    private final Map<UUID, Location> netherPortalLocations = new HashMap<>(); // 记录玩家进入地狱门的主世界坐标
     // 记录玩家最后一次打开背包的时间
     private final Map<UUID, Long> hunterBackpackCooldown = new HashMap<>();
     private final Map<UUID, Long> escaperBackpackCooldown = new HashMap<>();
@@ -114,25 +112,6 @@ public class StartGame implements Listener {
             respawnTasks.remove(playerId);
         }
     }
-
-    /**
-     * 监听玩家进入地狱门，记录主世界坐标
-     */
-    @EventHandler
-    public void onPlayerPortal(PlayerPortalEvent event) {
-        Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
-
-        // 只记录逃生者进入地狱门的坐标
-        if (!plugin.isEscaper(playerId)) return;
-
-        // 从主世界进入地狱时记录坐标
-        if (event.getFrom().getWorld().getEnvironment() == World.Environment.NORMAL &&
-            event.getCause() == PlayerPortalEvent.TeleportCause.NETHER_PORTAL) {
-            netherPortalLocations.put(playerId, event.getFrom());
-        }
-    }
-
 
 
     /**
@@ -228,7 +207,6 @@ public class StartGame implements Listener {
      */
     public void clearFinalBattleRespawnData() {
         finalBattleHunterRespawns.clear();
-        netherPortalLocations.clear();
     }
 
     public void resetRuntimeData() {
@@ -239,7 +217,6 @@ public class StartGame implements Listener {
         respawnTasks.clear();
         respawnTimers.clear();
         finalBattleHunterRespawns.clear();
-        netherPortalLocations.clear();
         hunterBackpackCooldown.clear();
         escaperBackpackCooldown.clear();
         playerVotes.clear();
@@ -454,6 +431,7 @@ public class StartGame implements Listener {
             // 功能性物品
             plugin.getHunterTracker().assignCompassAndTracking(hunter, false);
             plugin.giveSharedBackpack(hunter, true);
+            plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(hunter);
 
             // 消息与奖励
             plugin.getDataStorageManager().addProficiency(hunter, plugin.getRankManager().getGameStartReward());
@@ -475,6 +453,8 @@ public class StartGame implements Listener {
             // 功能性物品
             plugin.getHunterTracker().assignCompassAndTracking(escaper, true); // 逃生者不需要指南针，但可能需要注册被追踪状态
             plugin.giveSharedBackpack(escaper, false);
+            plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(escaper);
+            escaper.getInventory().addItem(new ItemStack(Material.BREAD, 3));
 
             // 消息与奖励
             plugin.getDataStorageManager().addProficiency(escaper, plugin.getRankManager().getGameStartReward());
@@ -491,6 +471,7 @@ public class StartGame implements Listener {
         Location center = world.getSpawnLocation();
 
         // 原版猎人：所有玩家传送到同一地点，关在同一屏障笼子里
+        plugin.setPvpLocked(true);
         locationFinder.findLocation(world, center, 100, 1000, (spawnLocation) -> {
             // 将原版猎人开局屏障整体上抬 2 格，避免笼子与地形重叠
             Location cageCenter = spawnLocation.clone().add(0, 2, 0);
@@ -502,6 +483,7 @@ public class StartGame implements Listener {
             broadcastPlayerCounts();
             plugin.setGameInProgress(true);
             plugin.glassCageManager.createGroupCage(allPlayers, cageCenter);
+            plugin.setPvpLocked(false);
         });
 
         Bukkit.broadcastMessage(plugin.getMessage("vanilla_hunter_started", "&7===== 经典猎人 已启动 ====="));
@@ -755,7 +737,7 @@ public class StartGame implements Listener {
 
 
     int calculateRespawnTime(long gameTime) {
-        int baseRespawnTime = plugin.getConfig().getInt("game.respawn.baseRespawnTime", 5); // 基础复活时间（秒）
+        int baseRespawnTime = Math.max(30, plugin.getConfig().getInt("game.respawn.baseRespawnTime", 30)); // 基础复活时间（秒）
         int maxRespawnTime = plugin.getConfig().getInt("game.respawn.maxRespawnTime", 180); // 最大复活时间（秒）
         long maxGameTime = plugin.getConfig().getInt("game.respawn.maxGameTime", 3000); // 最大推移时间（秒）
 
@@ -833,42 +815,13 @@ public class StartGame implements Listener {
                 }
             }
         } else {
-            // 非终章模式，原有逻辑
             World world = Bukkit.getWorld("world");
             if (world != null) {
-                // 获取玩家设置的床重生点
                 Location bedSpawn = player.getBedSpawnLocation();
-                if (bedSpawn != null) {
-                    // 如果玩家有床重生点，则传送至床
+                if (isValidVanillaHunterBedSpawn(bedSpawn, world)) {
                     player.teleport(bedSpawn);
                 } else {
-                    // 找到最近的逃生者位置
-                    Location escaperLocation = findClosestEscaper();
-                    if (escaperLocation != null) {
-                        // 检查逃生者是否在主世界
-                        if (escaperLocation.getWorld().getEnvironment() == World.Environment.NORMAL) {
-                            // 逃生者在主世界，复活到逃生者附近
-                            int respawnRadius = plugin.getConfig().getInt("game.hunter_respawn_radius", 50);
-                            Location respawnLocation = getRandomLocationNear(escaperLocation, respawnRadius);
-                            player.teleport(respawnLocation);
-                        } else {
-                            // 逃生者在地狱或末地，复活到地狱门附近
-                            Location portalLocation = findNetherPortalLocation();
-                            if (portalLocation != null) {
-                                int respawnRadius = plugin.getConfig().getInt("hunter_respawn.radius", 50);
-                                Location respawnLocation = getRandomLocationNear(portalLocation, respawnRadius);
-                                player.teleport(respawnLocation);
-                            } else {
-                                // 没有记录地狱门坐标，传送到世界出生点
-                                Location spawnLocation = world.getSpawnLocation();
-                                player.teleport(spawnLocation);
-                            }
-                        }
-                    } else {
-                        // 没有逃生者，传送到世界出生点
-                        Location spawnLocation = world.getSpawnLocation();
-                        player.teleport(spawnLocation);
-                    }
+                    player.teleport(world.getSpawnLocation());
                 }
             }
         }
@@ -880,11 +833,12 @@ public class StartGame implements Listener {
             if (plugin.isFinalBattleMode()) {
                 plugin.getFinalBattleProfessionManager().giveSelectedProfessionLoadout(player);
             } else {
-                plugin.giveSharedBackpack(player, true);
                 // 其他模式使用 hunter_resupply 配置
                 if (plugin.getConfig().getBoolean("hunter_resupply.enable", false)) {
                     giveResupplyItems(player);
                 }
+                plugin.getHunterTracker().startTrackingHunter(player);
+                plugin.giveSharedBackpack(player, true);
             }
 
 
@@ -896,40 +850,11 @@ public class StartGame implements Listener {
         }, 40L); // 40 ticks = 2秒
     }
 
-    /**
-     * 找到最近的逃生者位置
-     */
-    private Location findClosestEscaper() {
-        Player closestEscaper = null;
-        double minDistance = Double.MAX_VALUE;
-        World mainWorld = Bukkit.getWorld("world");
 
-        // 优先查找主世界的逃生者
-        for (Player escaper : plugin.getEscapers()) {
-            if (escaper == null || !escaper.isOnline()) continue;
-
-            // 只计算主世界的逃生者
-            if (escaper.getWorld().equals(mainWorld)) {
-                Location spawnLocation = mainWorld.getSpawnLocation();
-                double distance = escaper.getLocation().distance(spawnLocation);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestEscaper = escaper;
-                }
-            }
-        }
-
-        // 如果主世界没有逃生者，返回任意逃生者的位置
-        if (closestEscaper == null) {
-            for (Player escaper : plugin.getEscapers()) {
-                if (escaper != null && escaper.isOnline()) {
-                    return escaper.getLocation();
-                }
-            }
-        }
-
-        return closestEscaper != null ? closestEscaper.getLocation() : null;
+    private boolean isValidVanillaHunterBedSpawn(Location bedSpawn, World mainWorld) {
+        return bedSpawn != null
+                && bedSpawn.getWorld() != null
+                && bedSpawn.getWorld().equals(mainWorld);
     }
 
     /**
@@ -1018,45 +943,6 @@ public class StartGame implements Listener {
                !feet.isLiquid() &&
                !head.isLiquid() &&
                loc.getY() > 0; // 确保不在虚空
-    }
-
-    /**
-     * 找到任意逃生者进入地狱门的主世界坐标
-     */
-    private Location findNetherPortalLocation() {
-        for (Player escaper : plugin.getEscapers()) {
-            if (escaper == null || !escaper.isOnline()) continue;
-            UUID escaperId = escaper.getUniqueId();
-            if (netherPortalLocations.containsKey(escaperId)) {
-                return netherPortalLocations.get(escaperId);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 在指定位置附近随机生成一个安全的复活点
-     */
-    private Location getRandomLocationNear(Location center, int radius) {
-        World world = center.getWorld();
-        Random random = ThreadLocalRandom.current();
-
-        // 随机偏移
-        int offsetX = random.nextInt(radius * 2) - radius;
-        int offsetZ = random.nextInt(radius * 2) - radius;
-
-        Location targetLocation = new Location(
-            world,
-            center.getX() + offsetX,
-            center.getY(),
-            center.getZ() + offsetZ
-        );
-
-        // 获取该位置的最高方块Y坐标
-        int highestY = world.getHighestBlockYAt(targetLocation);
-        targetLocation.setY(highestY + 1);
-
-        return targetLocation;
     }
 
     /**

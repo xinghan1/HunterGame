@@ -1,0 +1,87 @@
+# 段位配置
+ranks:
+  0:
+    name: 新手上路
+    min: 0.0
+    max: 30.0
+  1:
+    name: 勇者之路
+    min: 30.0
+    max: 80.0
+  2:
+    name: 超级精英
+    min: 80.0
+    max: 100.0
+  3:
+    name: 超凡大师
+    min: 100.0
+    max: 130.0
+  4:
+    name: 傲世宗师
+    min: 130.0
+    max: 160.0
+  5:
+    name: 猎人战神
+    min: 200.0
+    max: 999999.0
+
+# 赛季配置指令奖励，赛季结算指令奖励
+season-rewards:
+  新手上路:
+    - "points give %player% 1000"
+    - "money give %player% 2000"
+    - "clv addexp 200 %player%"
+  勇者之路:
+    - "points give %player% 2500"
+    - "money give %player% 3000"
+    - "clv addexp 400 %player%"
+  超级精英:
+    - "points give %player% 5000"
+    - "money give %player% 7000"
+    - "clv addexp 500 %player%"
+  超凡大师:
+    - "points give %player% 8000"
+    - "money give %player% 10000"
+    - "clv addexp 800 %player%"
+  傲世宗师:
+    - "points give %player% 10000"
+    - "money give %player% 20000"
+    - "clv addexp 1000 %player%"
+  猎人战神:
+    - "points give %player% 12000"
+    - "money give %player% 30000"
+    - "clv addexp 1500 %player%"
+
+
+# 熟练度奖励配置
+# 结算公式：击杀*kill + 伤害*damage + 死亡*death + 胜利/失败
+proficiency-rewards:
+  enabled: true
+  GameStartReward: 0.3  # 游戏开始奖励
+  final_battle:
+    escaper:
+      kill: 0.5  # 击杀
+      damage: 0.01   # 伤害
+      death: -1.5   # 死亡
+      win: 5.0   # 胜利
+      fail: -2.0   # 失败
+    hunter:
+      kill: 3.0
+      damage: 0.015
+      death: -0.4
+      win: 1.5
+      fail: -2.0
+  ordinary_battle:
+    escaper:
+      kill: 1.0
+      damage: 0.015
+      death: -1.0
+      win: 10.0
+      fail: -2.5
+    hunter:
+      kill: 5.0
+      damage: 0.025
+      death: -0.2
+      win: 2.0
+      fail: -3.5
+

@@ -1,0 +1,202 @@
+# 技能总配置
+# enabled: 是否启用该技能。设置为 false 后，职业配置中即使写了该技能也不会发放/触发。
+# bossbar: 技能 BossBar 显示文字。
+# bossbar.ready: 技能就绪时显示。
+# bossbar.duration: 技能持续中显示，支持 %seconds%。
+# bossbar.cooldown: 技能冷却中显示，支持 %seconds%。
+# 可用占位符：%skill%=技能名，%seconds%=剩余秒数，%trigger%=触发方式。
+# cooldown: 技能冷却时间，单位为秒。
+# duration: 技能持续时间，单位为秒。瞬发技能填 0。
+# parameters: 每个技能的独立参数。
+# 注意：所有 *_ticks 参数单位为 tick，20 ticks = 1 秒。
+# 注意：药水效果 amplifier 使用 Bukkit 内部等级，0=I，1=II，2=III，以此类推。
+skills:
+  # 双击空格触发二段跳。
+  二段跳:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 双击跳跃"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 双击跳跃"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 双击跳跃"
+    cooldown: 25
+    duration: 0
+    parameters:
+      hunter_vertical_power: 1.0      # 猎人向上弹跳力度
+      hunter_horizontal_power: 1.5    # 猎人向前冲刺力度
+      escaper_vertical_power: 1.3     # 逃生者向上弹跳力度
+      escaper_horizontal_power: 1.8   # 逃生者向前冲刺力度
+      reset_flight_ticks: 40          # 触发后多久强制关闭飞行权限，防止异常悬空
+
+  # 手持长矛右键，朝当前水平朝向突进一段距离。
+  突进:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持长矛+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持长矛+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持长矛+右键"
+    cooldown: 45
+    duration: 0
+    parameters:
+      delay_seconds: 0.5 # 延迟触发(秒)
+      acceleration_ticks: 6 # 分几 tick 完成水平突进，越大瞬间速度越低，总突进力度不变
+      forward_strength: 4.0 # 向前突进力度
+      upward_strength: 0.3 # 向上击飞力度
+      max_spear_damage: 30.0 # 长矛单次伤害上限
+
+  # 手持工具/武器右键，在面前生成即将爆炸的 TNT。
+  爆破专家:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 40
+    duration: 0
+    parameters:
+      tnt_count: 3                    # 生成 TNT 数量
+      fuse_ticks:                     # 每个 TNT 的引信时间，数量不足时使用最后一个值
+        - 10
+        - 15
+        - 20
+      forward_offset: 1.2             # TNT 生成点相对玩家视线向前偏移距离
+      y_offset: 0.8                   # TNT 生成点相对玩家脚底向上偏移距离
+
+  # 手持工具/武器右键，隐身并隐藏装备。
+  隐身:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 120
+    duration: 20                      # 隐身持续时间
+    parameters:
+      speed_amplifier: 1              # 隐身期间速度药水等级，0=速度 II
+      resistance_amplifier: 3         # 隐身期间抗性等级，1=抗性 III
+
+  # 手持工具/武器右键，短时间获得高等级急迫。
+  盾构机:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 120
+    duration: 30                      # 急迫持续时间
+    parameters:
+      haste_amplifier: 254            # 急迫等级，数值很高时接近瞬间挖掘
+
+  # 手持工具/武器右键，获得抗性并附带减速。
+  神龟:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: %trigger%"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 120
+    duration: 20                      # 抗性和减速持续时间
+    parameters:
+      resistance_amplifier: 3         # 抗性等级，3=抗性 IV
+      slowness_amplifier: 0           # 缓慢等级，0=缓慢 I
+
+  # 猎人选择该技能后获得爆炸弩，左键职业弩补充爆炸火箭。
+  爆炸弩:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持爆炸弩+左键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持爆炸弩+左键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持爆炸弩+左键"
+    cooldown: 120
+    duration: 0
+    parameters:
+      rockets_per_supply: 10           # 每次补充的爆炸火箭数量
+      true_damage: 3.0                 # 爆炸命中半径内造成的固定真实伤害，1点=半颗心
+
+  # 手持工具/武器右键，临时进入旁观模式穿墙。
+  穿墙:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 90
+    duration: 5                       # 穿墙持续时间，到时自动回到生存模式
+    parameters: {}
+
+  # 手持工具/武器右键，击退附近生存模式玩家。
+  击退领域:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 60
+    duration: 0
+    parameters:
+      radius: 10.0                    # 搜索并击退玩家的半径
+      horizontal_strength: 9.0        # 水平击退力度
+      vertical_strength: 1.5          # 向上击退力度
+
+  # 手持工具/武器右键，获得高速移动，结束后短暂减速。
+  肾上腺爆发:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 120
+    duration: 20                      # 猎人基础加速持续时间
+    parameters:
+      escaper_extra_seconds: 5        # 逃生者额外增加的加速秒数
+      speed_amplifier: 4              # 加速等级，4=速度 V
+      slowness_after_seconds: 3       # 加速结束后的减速持续秒数
+      slowness_after_amplifier: 1     # 加速结束后的减速等级，1=缓慢 II
+
+  # 手持工具/武器右键，面前生成岩浆并获得抗火；攻击时概率点燃目标。
+  熔岩行者:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 40
+    duration: 0
+    parameters:
+      lava_offset: 1.0                # 岩浆生成点相对玩家朝向的前方距离
+      lava_y_offset: 1.0              # 岩浆生成点相对玩家脚底向上偏移距离
+      fire_resistance_ticks: 2147483647 # 抗火持续 tick，默认接近永久
+      fire_resistance_amplifier: 0    # 抗火等级，0=抗火 I
+      fire_chance: 0.20               # 攻击时点燃目标概率，0.20=20%
+      fire_ticks: 60                  # 点燃目标持续 tick，60=3 秒
+
+  # 手持工具/武器右键，朝视线方向传送一段距离。
+  闪现:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 120
+    duration: 0
+    parameters:
+      hunter_distance: 30             # 猎人闪现距离
+      escaper_distance: 30            # 逃生者闪现距离
+      resistance_ticks: 200           # 闪现后抗性持续 tick，200=10 秒
+      resistance_amplifier: 100       # 闪现后抗性等级
+      speed_ticks: 200                # 闪现后速度持续 tick，200=10 秒
+      speed_amplifier: 1              # 闪现后速度等级，1=速度 II
+
+  # 手持工具/武器右键，定身所有在线逃生者并让逃生者发光。
+  定身术:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+    cooldown: 90
+    parameters:
+      freeze_ticks: 100                # 实际定身持续 tick，60=3 秒
+      glow_ticks: 1200                # 逃生者发光持续 tick，1200=60 秒
+      haste_ticks: 2147483647         # 猎人获得急迫持续 tick，默认接近永久
+      haste_amplifier: 2              # 急迫等级，2=急迫 III
+      frozen_resistance_amplifier: 4 # 被定身者获得的抗性等级，防止定身期间被秒杀

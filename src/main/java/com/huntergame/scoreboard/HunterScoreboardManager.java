@@ -63,6 +63,7 @@ public class HunterScoreboardManager {
                 .replace("%finalbattle_time%", getFinalBattleTime())
                 .replace("%finalbattle_remaining%", getFinalBattleRemainingTime());
 
+
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             text = PlaceholderAPI.setPlaceholders(player, text);
         }
@@ -81,30 +82,6 @@ public class HunterScoreboardManager {
         long elapsed = (System.currentTimeMillis() - finalBattleStartTime) / 1000;
         long remain = Math.max(0, 30 * 60 - elapsed);
         return String.format("%02d:%02d", remain / 60, remain % 60);
-    }
-
-    private void sendViaBaseAPI(Player player, String title, List<String> lines, ScoreboardContext context) {
-        if (baseAPI == null) {
-            return;
-        }
-        Map<String, Object> eventData = new HashMap<>();
-
-        // 标题
-        eventData.put("title", ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&', title)));
-
-        List<String> order = new ArrayList<>();
-        Map<String, String> text_dict = new LinkedHashMap<>();
-
-        for (int i = 0; i < lines.size(); i++) {
-            String key = String.valueOf(i + 1);
-            order.add(key);
-            text_dict.put(key, replaceCommon(player, lines.get(i), context));
-        }
-        eventData.put("order", order);
-        eventData.put("text_dict", text_dict);
-
-        // 发包
-        baseAPI.notifyToClient(player, "Xigua_common", "main", "SetScoreboard", eventData);
     }
 
 
@@ -144,26 +121,17 @@ public class HunterScoreboardManager {
 
     public void updateWaitingBoard(Player p) {
         ScoreboardContext context = createContext();
-        if (useBaseAPI)
-            sendViaBaseAPI(p, waitingTitle, waitingLines, context);
-        else
-            sendViaBukkit(p, "waiting", waitingTitle, waitingLines, waitingBoards, context);
+        sendViaBukkit(p, "waiting", waitingTitle, waitingLines, waitingBoards, context);
     }
 
     public void updateGameBoard(Player p) {
         ScoreboardContext context = createContext();
-        if (useBaseAPI)
-            sendViaBaseAPI(p, gameTitle, gameLines, context);
-        else
-            sendViaBukkit(p, "game", gameTitle, gameLines, gameBoards, context);
+        sendViaBukkit(p, "game", gameTitle, gameLines, gameBoards, context);
     }
 
     public void updateFinalBattleBoard(Player p) {
         ScoreboardContext context = createContext();
-        if (useBaseAPI)
-            sendViaBaseAPI(p, finalBattleTitle, finalBattleLines, context);
-        else
-            sendViaBukkit(p, "final_battle", finalBattleTitle, finalBattleLines, finalBattleBoards, context);
+        sendViaBukkit(p, "final_battle", finalBattleTitle, finalBattleLines, finalBattleBoards, context);
     }
 
     private ScoreboardContext createContext() {
@@ -186,13 +154,5 @@ public class HunterScoreboardManager {
         }
     }
 
-
-    public void setDragonHealth(double dragonHealth) {
-        this.dragonHealth = dragonHealth;
-    }
-
-    public void setFinalBattleStartTime(long time) {
-        this.finalBattleStartTime = time;
-    }
 }
 

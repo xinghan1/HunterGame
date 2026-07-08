@@ -2,21 +2,15 @@ package com.huntergame.bedrock;
 
 import com.huntergame.gui.GuideGUI;
 import com.huntergame.HunterGame;
-import com.xigua.baseAPI.BaseAPI;
-import com.xigua.cumulus.form.SimpleForm;
-import org.bukkit.Bukkit;
+import com.huntergame.util.FloodgateSupport;
 import org.bukkit.entity.Player;
+import org.geysermc.cumulus.form.SimpleForm;
 
 import java.util.List;
 
 public class BedrockGuideGUI {
 
     public static void openBedrockGuide(HunterGame plugin, List<GuideGUI.GuideItem> guideItems, String guiTitle, Player player) {
-        BaseAPI baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (baseAPI == null) {
-            return;
-        }
-
         // 构建长文本内容
         StringBuilder contentBuilder = new StringBuilder();
         // 遍历所有配置好的物品
@@ -35,7 +29,7 @@ public class BedrockGuideGUI {
                 .title(guiTitle)
                 .content(contentBuilder.toString())
                 .button(plugin.getMessage("bedrock_guide_close_button", "&c关闭界面"));
-        baseAPI.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 }
 

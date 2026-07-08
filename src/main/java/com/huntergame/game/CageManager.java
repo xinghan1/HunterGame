@@ -6,6 +6,8 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashSet;
@@ -82,6 +84,7 @@ public class CageManager {
                 for (Player player : players) {
                     playerCages.remove(player.getUniqueId());
                 }
+                grantVanillaEscaperStartSpeed(players);
                 // 广播开始标题
                 for (org.bukkit.entity.Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
                     online.sendTitle(
@@ -96,6 +99,16 @@ public class CageManager {
     }
 
 
+
+
+    private void grantVanillaEscaperStartSpeed(List<Player> players) {
+        PotionEffect speedBoost = new PotionEffect(PotionEffectType.SPEED, 30 * 20, 1, false, false);
+        for (Player player : players) {
+            if (player != null && player.isOnline() && plugin.isEscaper(player.getUniqueId())) {
+                player.addPotionEffect(speedBoost, true);
+            }
+        }
+    }
 
     public void cleanup() {
         for (Integer taskId : taskIds.values()) {

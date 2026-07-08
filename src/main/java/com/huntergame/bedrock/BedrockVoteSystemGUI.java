@@ -1,14 +1,13 @@
 package com.huntergame.bedrock;
 
 import com.huntergame.HunterGame;
+import com.huntergame.util.FloodgateSupport;
 import com.huntergame.vote.VoteSystem;
-import com.xigua.baseAPI.BaseAPI;
-import com.xigua.cumulus.form.SimpleForm;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.geysermc.cumulus.form.SimpleForm;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,11 +18,6 @@ public class BedrockVoteSystemGUI {
      * 打开基岩版投票主菜单
      */
     public static void openBedrockVoteMenu(VoteSystem voteSystem, ConfigurationSection voteGuiConfig, HunterGame plugin, Player player) {
-        BaseAPI baseAPI = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (baseAPI == null) {
-            return;
-        }
-
         if (voteSystem.isFixedModeEnabled()) {
             Object[] fixedModeInfo = voteSystem.getFixedModeInfo();
             voteSystem.recordPlayerModeChoice(player, (int) fixedModeInfo[0]);
@@ -51,7 +45,7 @@ public class BedrockVoteSystemGUI {
                             }
                         }.runTask(plugin);
                     });
-            baseAPI.sendForm(player.getUniqueId(), builder);
+            FloodgateSupport.sendForm(player, builder);
         } else {
             SimpleForm.Builder builder = SimpleForm.builder()
                     .title(plugin.getMessage("bedrock_vote_menu_title", "&c&l游戏投票"))
@@ -80,7 +74,7 @@ public class BedrockVoteSystemGUI {
                             }
                         }.runTask(plugin);
                     });
-            baseAPI.sendForm(player.getUniqueId(), builder);
+            FloodgateSupport.sendForm(player, builder);
         }
     }
 
@@ -88,11 +82,6 @@ public class BedrockVoteSystemGUI {
      * 注意：这里改为 static 方法
      */
     public static void openBedrockModeVote(VoteSystem voteSystem, ConfigurationSection voteGuiConfig, HunterGame plugin, Player player) {
-        BaseAPI spigotMaster = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (spigotMaster == null) {
-            return;
-        }
-
         ConfigurationSection modeSection = voteGuiConfig.getConfigurationSection("mode-section.items");
         if (modeSection == null) return;
 
@@ -145,18 +134,13 @@ public class BedrockVoteSystemGUI {
             }.runTask(plugin);
         });
 
-        spigotMaster.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 
     /**
      * 注意：这里改为 static 方法
      */
     public static void openBedrockRoleVote(VoteSystem voteSystem, ConfigurationSection voteGuiConfig, HunterGame plugin, Player player) {
-        BaseAPI spigotMaster = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (spigotMaster == null) {
-            return;
-        }
-
         if (!voteSystem.isFixedModeEnabled() && !voteSystem.playerModeChoice.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.translateAlternateColorCodes('&',
                     voteGuiConfig.getString("messages.no-mode-selected", "&e请先选择游戏模式！")));
@@ -219,18 +203,13 @@ public class BedrockVoteSystemGUI {
             }.runTask(plugin);
         });
 
-        spigotMaster.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 
     /**
      * 基岩版胜利条件（战役类型）投票表单
      */
     public static void openBedrockTypeVote(VoteSystem voteSystem, ConfigurationSection voteGuiConfig, HunterGame plugin, Player player) {
-        BaseAPI spigotMaster = (BaseAPI) Bukkit.getPluginManager().getPlugin("BaseAPI");
-        if (spigotMaster == null) {
-            return;
-        }
-
         ConfigurationSection typeSection = voteGuiConfig.getConfigurationSection("type-section.items");
         if (typeSection == null) return;
 
@@ -279,7 +258,7 @@ public class BedrockVoteSystemGUI {
             }.runTask(plugin);
         });
 
-        spigotMaster.sendForm(player.getUniqueId(), builder);
+        FloodgateSupport.sendForm(player, builder);
     }
 }
 

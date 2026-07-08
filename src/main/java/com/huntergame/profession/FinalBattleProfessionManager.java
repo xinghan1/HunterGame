@@ -232,8 +232,7 @@ public class FinalBattleProfessionManager implements Listener {
         applyMaxHealth(player, profession);
         giveProfessionItems(player, profession);
         giveProfessionSkill(player, profession);
-        applyPotionEffects(player, profession);
-        return true;
+        applyPotionEffects(player, profession);        return true;
     }
 
     private Profession loadProfession(File file) {
@@ -607,8 +606,7 @@ public class FinalBattleProfessionManager implements Listener {
         applyMaxHealth(player, profession);
         giveProfessionItems(player, profession);
         giveProfessionSkill(player, profession);
-        applyPotionEffects(player, profession);
-        player.sendMessage(plugin.getMessage("profession_selected", "&a你选择了终章职业: %profession%")
+        applyPotionEffects(player, profession);        player.sendMessage(plugin.getMessage("profession_selected", "&a你选择了终章职业: %profession%")
                 .replace("%profession%", profession.displayName));
         player.closeInventory();
     }

@@ -41,12 +41,19 @@ public class DisconnectProtectionService implements Listener {
 
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId(); // 使用UUID作为键
+        boolean isRespawning = plugin.getStartGameCommand() != null
+                && plugin.getStartGameCommand().isPlayerRespawning(playerId);
 
-        if (player.getGameMode() == GameMode.SPECTATOR) {
+        if (player.getGameMode() == GameMode.SPECTATOR && !isRespawning) {
             return;
         }
 
         boolean isEscaper = plugin.isEscaper(playerId);
+        boolean isHunter = plugin.isHunter(playerId);
+        if (!isEscaper && !isHunter) {
+            return;
+        }
+
         playerRoles.put(playerId, isEscaper);
         lastLocations.put(playerId, player.getLocation().clone());
         playerDisconnectTime.put(playerId, System.currentTimeMillis());
@@ -78,9 +85,12 @@ public class DisconnectProtectionService implements Listener {
             // 恢复角色
             if (wasEscaper) {
                 plugin.addEscaper(uuid);
+                plugin.getHunterTracker().startTrackingEscaper(player);
                 player.sendMessage(plugin.getMessage("recover_escape", "&a欢迎回来！已恢复逃生者角色"));
             } else {
                 plugin.addHunter(uuid);
+                plugin.getHunterTracker().startTrackingHunter(player);
+                plugin.giveSharedBackpack(player, true);
                 player.sendMessage(plugin.getMessage("recover_hunter", "&a欢迎回来！已恢复猎人角色"));
             }
 

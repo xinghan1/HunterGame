@@ -98,6 +98,11 @@ public class DragonFightListener implements Listener {
             return;
         }
 
+        if (plugin.isPvpLocked()) {
+            event.setCancelled(true);
+            return;
+        }
+
         if (plugin.glassCageManager.isInCage(attacker) || plugin.glassCageManager.isInCage(victim)) {
             event.setCancelled(true);
             return;
