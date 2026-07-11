@@ -25,8 +25,9 @@ public class SeasonManager implements Listener {
     private File seasonDataFile;
     private FileConfiguration seasonDataConfig;
 
-    private String currentSeasonId; // 赛季ID为String类型
+    private volatile String currentSeasonId; // 多服刷新线程与主线程都会读取
     private Map<String, List<String>> seasonRewards = new HashMap<>();
+    private CompletableFuture<Void> databaseReady = CompletableFuture.completedFuture(null);
 
     public SeasonManager(HunterGame plugin, RankManager rankManager, DataStorageManager dataStorageManager) {
         this.plugin = plugin;
@@ -40,7 +41,7 @@ public class SeasonManager implements Listener {
 
         if (isUsingMySQL()) {
             this.currentSeasonId = "S1";
-            initializeDatabaseAsync();
+            databaseReady = initializeDatabaseAsync();
         } else {
             this.currentSeasonId = getCurrentSeasonIdFromFile();
             if (this.currentSeasonId == null || this.currentSeasonId.isEmpty()) {
@@ -64,7 +65,7 @@ public class SeasonManager implements Listener {
         plugin.getLogger().info("正在准备新赛季: " + seasonId);
 
         if (isUsingMySQL()) {
-            return isSeasonIdExistsAsync(seasonId).thenCompose(exists -> {
+            return databaseReady.thenCompose(ignored -> isSeasonIdExistsAsync(seasonId)).thenCompose(exists -> {
                 if (exists) {
                     plugin.getLogger().severe("无法开始新赛季！赛季ID '" + seasonId + "' 已存在。");
                     return CompletableFuture.completedFuture(false);
@@ -118,8 +119,18 @@ public class SeasonManager implements Listener {
         String playerName = player.getName();
 
         if (isUsingMySQL()) {
-            hasPlayerClaimedSeasonRewardAsync(playerId).thenAccept(claimed -> {
-                if (!claimed) grantSeasonReward(playerId, playerName, dataStorageManager.getProficiency(playerId));
+            databaseReady
+                    .thenCompose(ignored -> dataStorageManager.refreshPlayerAsync(playerId))
+                    .thenApply(ignored -> {
+                        if (plugin.getHunterGamePlaceholder() != null) {
+                            plugin.getHunterGamePlaceholder().refreshAllTiersSilently();
+                        }
+                        return ignored;
+                    })
+                    .thenCompose(ignored -> refreshCurrentSeasonIdAsync())
+                    .thenCompose(ignored -> claimSeasonRewardAsync(playerId))
+                    .thenAccept(claimed -> {
+                if (claimed) grantSeasonReward(playerId, playerName, dataStorageManager.getProficiency(playerId));
             }).exceptionally(error -> {
                 plugin.getLogger().warning("检查赛季奖励失败: " + messageOf(error));
                 return null;
@@ -134,7 +145,10 @@ public class SeasonManager implements Listener {
         String seasonId = currentSeasonId;
         Bukkit.getScheduler().runTask(plugin, () -> {
             Player player = Bukkit.getPlayer(playerId);
-            if (player == null || !player.isOnline()) return;
+            if (player == null || !player.isOnline()) {
+                if (isUsingMySQL()) releaseSeasonRewardClaim(playerId, seasonId);
+                return;
+            }
 
             List<String> commands = seasonRewards.get(rank);
             if (commands != null) {
@@ -156,7 +170,7 @@ public class SeasonManager implements Listener {
             } else {
                 plugin.getLogger().warning("玩家 " + playerName + " 的段位 " + rank + " 没有配置对应的赛季奖励。");
             }
-            markPlayerClaimedSeasonReward(playerId);
+            if (!isUsingMySQL()) markPlayerClaimedSeasonRewardInFile(playerId);
         });
     }
 
@@ -165,7 +179,7 @@ public class SeasonManager implements Listener {
         return dataStorageManager.isUsingUnifiedDatabase();
     }
 
-    private void initializeDatabaseAsync() {
+    private CompletableFuture<Void> initializeDatabaseAsync() {
         String createTableSQL = "CREATE TABLE IF NOT EXISTS season_info (" +
                 "id INT AUTO_INCREMENT PRIMARY KEY, " +
                 "season_id VARCHAR(50) NOT NULL COMMENT '赛季的唯一ID (例如: S1, 2024_春季)', " +
@@ -175,7 +189,7 @@ public class SeasonManager implements Listener {
                 "UNIQUE KEY unique_season_player (season_id, player_uuid) " +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赛季信息和玩家奖励领取记录表';";
 
-        dataStorageManager.executeAsync(createTableSQL, Collections.emptyList())
+        return dataStorageManager.executeAsync(createTableSQL, Collections.emptyList())
                 .thenCompose(ignored -> dataStorageManager.queryAsync(
                         "SELECT season_id FROM season_info WHERE player_uuid = 'system' LIMIT 1",
                         Collections.emptyList()))
@@ -195,10 +209,29 @@ public class SeasonManager implements Listener {
                 });
     }
 
-    private CompletableFuture<Boolean> hasPlayerClaimedSeasonRewardAsync(UUID playerId) {
-        String sql = "SELECT 1 FROM season_info WHERE season_id = ? AND player_uuid = ? LIMIT 1";
-        return dataStorageManager.queryAsync(sql, Arrays.asList(currentSeasonId, playerId.toString()))
-                .thenApply(rows -> !rows.isEmpty());
+    private CompletableFuture<Void> refreshCurrentSeasonIdAsync() {
+        return dataStorageManager.queryAsync(
+                        "SELECT season_id FROM season_info WHERE player_uuid = 'system' LIMIT 1",
+                        Collections.emptyList())
+                .thenAccept(rows -> {
+                    if (!rows.isEmpty()) currentSeasonId = String.valueOf(rows.get(0).get("season_id"));
+                })
+                .whenComplete((ignored, error) -> {
+                    if (error != null) plugin.getLogger().warning("跨服赛季信息刷新失败: " + messageOf(error));
+                });
+    }
+
+    private CompletableFuture<Boolean> claimSeasonRewardAsync(UUID playerId) {
+        String seasonId = currentSeasonId;
+        String sql = "INSERT IGNORE INTO season_info (season_id, player_uuid) VALUES (?, ?)";
+        return dataStorageManager.executeAsync(sql, Arrays.asList(seasonId, playerId.toString()))
+                .thenApply(affectedRows -> affectedRows > 0);
+    }
+
+    private void releaseSeasonRewardClaim(UUID playerId, String seasonId) {
+        dataStorageManager.executeAsync(
+                "DELETE FROM season_info WHERE season_id = ? AND player_uuid = ?",
+                Arrays.asList(seasonId, playerId.toString()));
     }
 
     private void markPlayerClaimedSeasonRewardInDB(UUID playerId) {

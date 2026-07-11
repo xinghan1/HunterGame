@@ -6,6 +6,7 @@ lobby:
   z: 0
 
 # MySQL 优先使用 database 软依赖；不可用时使用下面的内置 HikariCP 配置。
+# 多个游戏服必须连接同一个数据库，并使用相同的 table_prefix。
 database:
   type: "mysql" # 可选值：mysql（数据库）、file（本地文件）
   host: "localhost"

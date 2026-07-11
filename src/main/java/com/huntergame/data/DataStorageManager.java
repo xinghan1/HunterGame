@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -158,6 +159,42 @@ public class DataStorageManager {
         return readyFuture;
     }
 
+    public CompletableFuture<Void> refreshPlayerAsync(UUID uuid) {
+        if (!unifiedDatabase || shuttingDown) return CompletableFuture.completedFuture(null);
+        Map<UUID, Long> version = new HashMap<>();
+        PlayerStats stats = statsCache.get(uuid);
+        if (stats != null) {
+            synchronized (stats) { version.put(uuid, stats.mutationVersion); }
+        }
+        return readyFuture.thenCompose(ignored -> databaseClient.query(
+                        "SELECT * FROM " + tableName + " WHERE uuid = ?",
+                        Collections.singletonList(uuid.toString())))
+                .thenAccept(rows -> applyRefreshedRows(rows, version))
+                .exceptionally(error -> {
+                    if (!shuttingDown) plugin.getLogger().warning("玩家跨服数据刷新失败: " + messageOf(error));
+                    return null;
+                });
+    }
+
+    private void applyRefreshedRows(List<Map<String, Object>> rows, Map<UUID, Long> versionsAtStart) {
+        for (Map<String, Object> row : rows) {
+            UUID uuid = UUID.fromString(String.valueOf(row.get("uuid")));
+            PlayerStats persisted = PlayerStats.fromRow(row);
+            statsCache.compute(uuid, (ignored, current) -> {
+                if (current == null) return persisted;
+                Long expectedVersion = versionsAtStart.get(uuid);
+                synchronized (current) {
+                                if (expectedVersion != null
+                                        && current.mutationVersion == expectedVersion
+                                        && current.pendingWrites == 0) {
+                        current.replaceWith(persisted);
+                    }
+                }
+                return current;
+            });
+        }
+    }
+
     public CompletableFuture<List<Map<String, Object>>> queryAsync(String sql, List<Object> params) {
         if (!unifiedDatabase) return failedFuture(new IllegalStateException("统一 MySQL 未启用"));
         return readyFuture.thenCompose(ignored -> databaseClient.query(sql, safeParams(params)));
@@ -174,11 +211,16 @@ public class DataStorageManager {
     }
 
     public CompletableFuture<Void> resetSeasonalDataAsync() {
-        return enqueueWrite(() -> {
-            for (PlayerStats stats : statsCache.values()) {
+        List<PlayerStats> affected = new ArrayList<>(statsCache.values());
+        for (PlayerStats stats : affected) {
+            synchronized (stats) {
                 stats.proficiency = 0.0;
                 stats.rank = "";
+                stats.mutationVersion++;
+                if (unifiedDatabase) stats.pendingWrites++;
             }
+        }
+        CompletableFuture<Void> operation = enqueueWrite(() -> {
             if (unifiedDatabase) {
                 return databaseClient.execute(
                         "UPDATE " + tableName + " SET proficiency = 0.0, `rank` = ''",
@@ -187,6 +229,12 @@ public class DataStorageManager {
             }
             return saveFileSnapshotAsync();
         });
+        if (unifiedDatabase) operation.whenComplete((ignored, error) -> {
+            for (PlayerStats stats : affected) {
+                synchronized (stats) { stats.pendingWrites--; }
+            }
+        });
+        return operation;
     }
 
     public void resetSeasonalData() {
@@ -210,7 +258,7 @@ public class DataStorageManager {
     }
 
     public void addKillput(UUID playerId, String playerName) {
-        mutate(playerId, playerName, stats -> stats.killsPut++, "kills_put");
+        increment(playerId, playerName, stats -> stats.killsPut++, "kills_put", 1);
     }
 
     public int getKillsput(UUID playerId) {
@@ -218,7 +266,7 @@ public class DataStorageManager {
     }
 
     public void addDeath(UUID playerId, Player player) {
-        mutate(playerId, player.getName(), stats -> stats.deaths++, "deaths");
+        increment(playerId, player.getName(), stats -> stats.deaths++, "deaths", 1);
     }
 
     public int getDeaths(UUID playerId) {
@@ -226,7 +274,7 @@ public class DataStorageManager {
     }
 
     public void addGamePlayed(UUID playerId, Player player) {
-        mutate(playerId, player.getName(), stats -> stats.gamesPlayed++, "games_played");
+        increment(playerId, player.getName(), stats -> stats.gamesPlayed++, "games_played", 1);
     }
 
     public int getGamesPlayed(UUID playerId) {
@@ -234,10 +282,10 @@ public class DataStorageManager {
     }
 
     public void addHunterWin(UUID playerId, Player player) {
-        mutate(playerId, player.getName(), stats -> {
+        increment(playerId, player.getName(), stats -> {
             stats.hunterWins++;
-            stats.totalWins = stats.hunterWins + stats.escapeWins;
-        }, "hunter_wins", "total_wins");
+            stats.totalWins++;
+        }, "hunter_wins", 1, "total_wins", 1);
     }
 
     public int getHunterWin(UUID playerId) {
@@ -245,10 +293,10 @@ public class DataStorageManager {
     }
 
     public void addEscapeWin(UUID playerId, Player player) {
-        mutate(playerId, player.getName(), stats -> {
+        increment(playerId, player.getName(), stats -> {
             stats.escapeWins++;
-            stats.totalWins = stats.hunterWins + stats.escapeWins;
-        }, "escape_wins", "total_wins");
+            stats.totalWins++;
+        }, "escape_wins", 1, "total_wins", 1);
     }
 
     public int getEscapeWin(UUID playerId) {
@@ -256,7 +304,23 @@ public class DataStorageManager {
     }
 
     public void saveTotalWins(UUID playerId, Player player) {
-        mutate(playerId, player.getName(), stats -> stats.totalWins = stats.hunterWins + stats.escapeWins, "total_wins");
+        PlayerStats stats = statsCache.computeIfAbsent(playerId, ignored -> new PlayerStats());
+        synchronized (stats) {
+            stats.name = player.getName();
+            stats.totalWins = stats.hunterWins + stats.escapeWins;
+            stats.mutationVersion++;
+        }
+        if (unifiedDatabase) {
+            synchronized (stats) { stats.pendingWrites++; }
+            enqueueWrite(() -> databaseClient.execute(
+                    "UPDATE " + tableName + " SET name = ?, total_wins = hunter_wins + escape_wins WHERE uuid = ?",
+                    java.util.Arrays.asList(player.getName(), playerId.toString())))
+                    .whenComplete((ignored, error) -> {
+                        synchronized (stats) { stats.pendingWrites--; }
+                    });
+        } else {
+            enqueueWrite(this::saveFileSnapshotAsync);
+        }
     }
 
     public int getTotalWins(UUID playerId) {
@@ -265,7 +329,7 @@ public class DataStorageManager {
 
     public void addProficiency(Player player, double count) {
         UUID playerId = player.getUniqueId();
-        mutate(playerId, player.getName(), stats -> stats.proficiency += count, "proficiency");
+        increment(playerId, player.getName(), stats -> stats.proficiency += count, "proficiency", count);
     }
 
     public double getProficiency(Player player) {
@@ -293,11 +357,35 @@ public class DataStorageManager {
         return tiers;
     }
 
+    public CompletableFuture<Map<UUID, Integer>> getAllPlayerTiersAsync() {
+        if (!unifiedDatabase) return CompletableFuture.completedFuture(getAllPlayerTiers());
+        return readyFuture.thenCompose(ignored -> databaseClient.query(
+                        "SELECT uuid, proficiency FROM " + tableName + " WHERE proficiency > 0",
+                        Collections.emptyList()))
+                .thenApply(rows -> {
+                    List<Map.Entry<UUID, Double>> values = new ArrayList<>();
+                    for (Map<String, Object> row : rows) {
+                        values.add(new java.util.AbstractMap.SimpleImmutableEntry<>(
+                                UUID.fromString(String.valueOf(row.get("uuid"))),
+                                PlayerStats.number(row.get("proficiency")).doubleValue()));
+                    }
+                    values.sort(Map.Entry.<UUID, Double>comparingByValue().reversed());
+                    Map<UUID, Integer> tiers = new HashMap<>();
+                    int tier = 1;
+                    for (Map.Entry<UUID, Double> entry : values) tiers.put(entry.getKey(), tier++);
+                    return tiers;
+                });
+    }
+
     private void mutate(UUID uuid, String playerName, StatsMutation mutation, String... fields) {
         PlayerStats stats = statsCache.computeIfAbsent(uuid, ignored -> new PlayerStats());
         synchronized (stats) {
             stats.name = playerName == null ? stats.name : playerName;
             mutation.apply(stats);
+            stats.mutationVersion++;
+        }
+        if (unifiedDatabase) {
+            synchronized (stats) { stats.pendingWrites++; }
         }
         enqueueWrite(() -> {
             PlayerStats snapshot;
@@ -305,7 +393,58 @@ public class DataStorageManager {
                 snapshot = stats.copy();
             }
             return unifiedDatabase ? persistMySql(uuid, snapshot, fields) : saveFileSnapshotAsync();
+        }).whenComplete((ignored, error) -> {
+            if (unifiedDatabase) {
+                synchronized (stats) { stats.pendingWrites--; }
+            }
         });
+    }
+
+    private void increment(UUID uuid, String playerName, StatsMutation mutation, Object... fieldDeltas) {
+        PlayerStats stats = statsCache.computeIfAbsent(uuid, ignored -> new PlayerStats());
+        synchronized (stats) {
+            stats.name = playerName == null ? stats.name : playerName;
+            mutation.apply(stats);
+            stats.mutationVersion++;
+        }
+
+        if (!unifiedDatabase) {
+            enqueueWrite(this::saveFileSnapshotAsync);
+            return;
+        }
+
+        Map<String, Number> deltas = new LinkedHashMap<>();
+        for (int index = 0; index < fieldDeltas.length; index += 2) {
+            deltas.put((String) fieldDeltas[index], (Number) fieldDeltas[index + 1]);
+        }
+        synchronized (stats) { stats.pendingWrites++; }
+        enqueueWrite(() -> persistIncrementMySql(uuid, playerName, deltas))
+                .whenComplete((ignored, error) -> {
+                    synchronized (stats) { stats.pendingWrites--; }
+                });
+    }
+
+    private CompletableFuture<Integer> persistIncrementMySql(
+            UUID uuid, String playerName, Map<String, Number> deltas) {
+        StringBuilder columns = new StringBuilder("uuid, name");
+        StringBuilder placeholders = new StringBuilder("?, ?");
+        StringBuilder updates = new StringBuilder("name = VALUES(name)");
+        List<Object> params = new ArrayList<>();
+        params.add(uuid.toString());
+        params.add(playerName == null ? "" : playerName);
+
+        for (Map.Entry<String, Number> entry : deltas.entrySet()) {
+            String field = entry.getKey();
+            columns.append(", `").append(field).append('`');
+            placeholders.append(", ?");
+            updates.append(", `").append(field).append("` = `").append(field)
+                    .append("` + VALUES(`").append(field).append("`)");
+            params.add(entry.getValue());
+        }
+
+        String sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + placeholders + ") " +
+                "ON DUPLICATE KEY UPDATE " + updates;
+        return databaseClient.execute(sql, params);
     }
 
     private CompletableFuture<Integer> persistMySql(UUID uuid, PlayerStats stats, String... fields) {
@@ -428,6 +567,8 @@ public class DataStorageManager {
         private volatile int totalWins;
         private volatile double proficiency;
         private volatile String rank = "";
+        private long mutationVersion;
+        private int pendingWrites;
 
         private static PlayerStats fromRow(Map<String, Object> row) {
             PlayerStats stats = new PlayerStats();
@@ -482,7 +623,20 @@ public class DataStorageManager {
             copy.totalWins = totalWins;
             copy.proficiency = proficiency;
             copy.rank = rank;
+            copy.mutationVersion = mutationVersion;
             return copy;
+        }
+
+        private void replaceWith(PlayerStats persisted) {
+            name = persisted.name;
+            killsPut = persisted.killsPut;
+            deaths = persisted.deaths;
+            gamesPlayed = persisted.gamesPlayed;
+            hunterWins = persisted.hunterWins;
+            escapeWins = persisted.escapeWins;
+            totalWins = persisted.totalWins;
+            proficiency = persisted.proficiency;
+            rank = persisted.rank;
         }
 
         private PlayerStats mergePersistedBase(PlayerStats persisted) {

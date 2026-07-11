@@ -17,6 +17,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class HunterGamePlaceholder extends PlaceholderExpansion implements Listener {
@@ -25,12 +26,14 @@ public class HunterGamePlaceholder extends PlaceholderExpansion implements Liste
     private static Location bastionLocation = null;
     private static Location fortressLocation = null;
     private final Map<UUID, Integer> tierCache = new ConcurrentHashMap<>();
+    private final AtomicBoolean tierRefreshInProgress = new AtomicBoolean();
     private boolean bastionSearchRunning = false;
     private boolean fortressSearchRunning = false;
 
     public HunterGamePlaceholder(HunterGame plugin) {
         this.plugin = plugin;
         scheduleWeeklyTierRefresh();
+        refreshAllTiers(false);
     }
 
     /**
@@ -48,17 +51,30 @@ public class HunterGamePlaceholder extends PlaceholderExpansion implements Liste
         long delayTicks = delaySeconds * 20L;
         long oneWeekTicks = 7L * 24 * 60 * 60 * 20; // 一周的tick数
 
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::refreshAllTiers, delayTicks, oneWeekTicks);
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> refreshAllTiers(true), delayTicks, oneWeekTicks);
     }
 
     /**
      * 批量刷新所有玩家的排名缓存
      */
     public void refreshAllTiers() {
-        Map<UUID, Integer> allTiers = plugin.getDataStorageManager().getAllPlayerTiers();
-        tierCache.clear();
-        tierCache.putAll(allTiers);
-        plugin.getLogger().info("猎人游戏全服排名已刷新。");
+        refreshAllTiers(true);
+    }
+
+    public void refreshAllTiersSilently() {
+        refreshAllTiers(false);
+    }
+
+    private void refreshAllTiers(boolean log) {
+        if (!tierRefreshInProgress.compareAndSet(false, true)) return;
+        plugin.getDataStorageManager().getAllPlayerTiersAsync().thenAccept(allTiers -> {
+            tierCache.clear();
+            tierCache.putAll(allTiers);
+            if (log) plugin.getLogger().info("猎人游戏全服排名已刷新。");
+        }).whenComplete((ignored, error) -> {
+            tierRefreshInProgress.set(false);
+            if (error != null) plugin.getLogger().warning("全服排名跨服刷新失败: " + error.getMessage());
+        });
     }
 
     @Override
