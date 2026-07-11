@@ -91,8 +91,11 @@ public class PlayerConnectionListener implements Listener {
         if (plugin.isHunter(playerId)) {
             plugin.getHunterTracker().startTrackingHunter(player);
             plugin.giveSharedBackpack(player, true);
+            plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
         } else if (plugin.isEscaper(playerId)) {
             plugin.getHunterTracker().startTrackingEscaper(player);
+            plugin.giveSharedBackpack(player, false);
+            plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
         }
     }
 

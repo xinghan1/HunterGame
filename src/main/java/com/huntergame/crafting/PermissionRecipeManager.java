@@ -108,7 +108,10 @@ public class PermissionRecipeManager implements Listener {
     }
 
     public void giveUnlockedRecipeBook(Player player) {
-        if (player == null || !player.isOnline() || getUnlockedRecipes(player).isEmpty()) {
+        if (player == null || !player.isOnline() || plugin.isFinalBattleMode() || getUnlockedRecipes(player).isEmpty()) {
+            return;
+        }
+        if (hasUnlockedRecipeBook(player)) {
             return;
         }
         player.getInventory().addItem(createRecipeBook(true));
@@ -195,14 +198,14 @@ public class PermissionRecipeManager implements Listener {
 
     @EventHandler
     public void onRecipeBookDrop(PlayerDropItemEvent event) {
-        if (isRecipeBook(event.getItemDrop().getItemStack())) {
+        if (isLockedRecipeBook(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onRecipeBookSwap(PlayerSwapHandItemsEvent event) {
-        if (isRecipeBook(event.getMainHandItem()) || isRecipeBook(event.getOffHandItem())) {
+        if (isLockedRecipeBook(event.getMainHandItem()) || isLockedRecipeBook(event.getOffHandItem())) {
             event.setCancelled(true);
         }
     }
@@ -230,7 +233,7 @@ public class PermissionRecipeManager implements Listener {
             return;
         }
 
-        if (isRecipeBook(event.getCurrentItem()) || isRecipeBook(event.getCursor())) {
+        if (isLockedRecipeBook(event.getCurrentItem()) || isLockedRecipeBook(event.getCursor())) {
             event.setCancelled(true);
         }
     }
@@ -244,7 +247,7 @@ public class PermissionRecipeManager implements Listener {
         }
 
         ItemStack oldCursor = event.getOldCursor();
-        if (isRecipeBook(oldCursor)) {
+        if (isLockedRecipeBook(oldCursor)) {
             event.setCancelled(true);
         }
     }
@@ -657,6 +660,23 @@ public class PermissionRecipeManager implements Listener {
         }
         Byte value = item.getItemMeta().getPersistentDataContainer().get(recipeBookKey, PersistentDataType.BYTE);
         return value != null && value == (byte) 2;
+    }
+
+    private boolean hasUnlockedRecipeBook(Player player) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isUnlockedOnlyRecipeBook(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isLockedRecipeBook(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+        Byte value = item.getItemMeta().getPersistentDataContainer().get(recipeBookKey, PersistentDataType.BYTE);
+        return value != null && value == (byte) 1;
     }
 
     private ItemStack createRecipeDisplayItem(Player player, PermissionRecipe recipe) {

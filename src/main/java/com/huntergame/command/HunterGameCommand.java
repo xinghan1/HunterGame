@@ -177,16 +177,16 @@ public class HunterGameCommand implements CommandExecutor, TabCompleter {
 
                     String newSeasonId = args[1];
 
-                    // 执行开始新赛季的方法
-                    boolean success = plugin.getSeasonManager().startNewSeason(newSeasonId);
-
-                    if (success) {
-                        sender.sendMessage(plugin.getMessage("new_season_started", "&a新赛季 '%season%' 已成功开始！")
-                                .replace("%season%", newSeasonId));
-
-                    } else {
-                        sender.sendMessage(plugin.getMessage("new_season_error", "&c新赛季创建失败！请检查控制台日志或确保赛季ID未被使用。"));
-                    }
+                    plugin.getSeasonManager().startNewSeasonAsync(newSeasonId).thenAccept(success ->
+                            Bukkit.getScheduler().runTask(plugin, () -> {
+                                if (success) {
+                                    sender.sendMessage(plugin.getMessage("new_season_started", "&a新赛季 '%season%' 已成功开始！")
+                                            .replace("%season%", newSeasonId));
+                                } else {
+                                    sender.sendMessage(plugin.getMessage("new_season_error", "&c新赛季创建失败！请检查控制台日志或确保赛季ID未被使用。"));
+                                }
+                            })
+                    );
 
                     return true;
 

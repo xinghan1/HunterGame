@@ -243,12 +243,14 @@ public class RoleSelectionHandler implements Listener {
                 }
                 plugin.getHunterTracker().startTrackingHunter(player);
                 plugin.giveSharedBackpack(player, true);
+                plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
             } else {
                 if (!plugin.isEscaper(playerId)) {
                     return;
                 }
                 plugin.getHunterTracker().assignCompassAndTracking(player, true);
                 plugin.giveSharedBackpack(player, false);
+                plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
             }
             player.updateInventory();
         }, 1L);

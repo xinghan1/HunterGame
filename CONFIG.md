@@ -6,17 +6,20 @@ lobby:
   y: 100.0
   z: 0
 
-# 数据库信息
+# MySQL 优先使用 database 软依赖；不可用时使用下面的内置 HikariCP 配置。
 database:
   type: "file" # 可选值：mysql（数据库）、file（本地文件）
-  host: "localhost"       # 数据库地址
-  port: 3306              # 端口
-  name: "root"       # 数据库名
-  username: ""        # 数据库用户名
-  password: ""            # 数据库密码
-  timezone: "Asia/Shanghai" # 时区
-  use_ssl: false          # 是否启用 SSL
+  host: "localhost"
+  port: 3306
+  name: "huntergame"
+  username: "root"
+  password: ""
+  timezone: "Asia/Shanghai"
+  use_ssl: false
+  pool_size: 5
+  connection_timeout_ms: 5000
   table_prefix: "hg_"        # 数据库表前缀
+  file_path: "player_data.yml" # type=file 或两种 MySQL 实现都初始化失败时使用
 
 game:
   minPlayers: 3        # 最小玩家人数

@@ -62,6 +62,7 @@ public class HunterRespawnListener implements Listener {
             }
             plugin.getHunterTracker().startTrackingHunter(player);
             plugin.giveSharedBackpack(player, true);
+            plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
         }, 40L); // 40 ticks = 2秒
     }
 

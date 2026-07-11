@@ -839,6 +839,7 @@ public class StartGame implements Listener {
                 }
                 plugin.getHunterTracker().startTrackingHunter(player);
                 plugin.giveSharedBackpack(player, true);
+                plugin.getPermissionRecipeManager().giveUnlockedRecipeBook(player);
             }
 
 

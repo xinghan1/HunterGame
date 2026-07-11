@@ -1,149 +1,200 @@
 package com.huntergame.data;
 
 import com.huntergame.HunterGame;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.*;
-import java.util.UUID;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class DataStorageManager {
 
+    private static final String[] PERSISTED_FIELDS = {
+            "kills_put", "deaths", "games_played", "hunter_wins",
+            "escape_wins", "total_wins", "proficiency", "rank"
+    };
+
     private final HunterGame plugin;
-    private final Map<UUID, Integer> killCache = new HashMap<>();
+    private final Map<UUID, Integer> killCache = new ConcurrentHashMap<>();
+    private final Map<UUID, PlayerStats> statsCache = new ConcurrentHashMap<>();
+    private final Object writeLock = new Object();
+    private final ExecutorService fileExecutor;
+    private final File dataFile;
+    private final String tableName;
 
-    private HikariDataSource dataSource;
-    private String databaseType;
-    private String tableName;
-
-    private File dataFile;
-    private FileConfiguration fileConfig;
-    private boolean fileDirty = false;
-    private int fileSaveTaskId = -1;
+    private UnifiedDatabaseClient databaseClient;
+    private boolean unifiedDatabase;
+    private volatile boolean shuttingDown;
+    private CompletableFuture<Void> readyFuture;
+    private CompletableFuture<Void> writeTail;
 
     public DataStorageManager(HunterGame plugin) {
         this.plugin = plugin;
-        this.databaseType = plugin.getConfig().getString("database.type", "file").toLowerCase();
-        String prefix = plugin.getConfig().getString("database.table_prefix", "");
-        this.tableName = prefix + "player_stats";
-        setupStorage();
-    }
+        this.tableName = sanitizeIdentifier(plugin.getConfig().getString("database.table_prefix", "") + "player_stats");
+        this.dataFile = new File(plugin.getDataFolder(), plugin.getConfig().getString("database.file_path", "player_data.yml"));
+        this.fileExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "HunterGame-FileStorage");
+            thread.setDaemon(true);
+            return thread;
+        });
 
-    private void setupStorage() {
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            setupMySQL();
+        this.unifiedDatabase = setupMySqlClient();
+        if (unifiedDatabase) {
+            readyFuture = initializeMySql();
         } else {
-            plugin.getLogger().warning("未指定有效的数据库类型或类型为 'file'，将使用本地文件存储！");
-            setupFileStorage();
+            loadFileStorage();
+            readyFuture = CompletableFuture.completedFuture(null);
         }
+        writeTail = readyFuture.handle((ignored, error) -> null);
     }
 
-    private void setupMySQL() {
-        String host = plugin.getConfig().getString("database.host", "localhost");
-        int port = plugin.getConfig().getInt("database.port", 3306);
-        String database = plugin.getConfig().getString("database.name", "minecraft");
-        String username = plugin.getConfig().getString("database.username", "root");
-        String password = plugin.getConfig().getString("database.password", "");
-        String timeZone = plugin.getConfig().getString("database.timezone", "UTC");
-        boolean useSSL = plugin.getConfig().getBoolean("database.use_ssl", false);
+    private boolean setupMySqlClient() {
+        if (!"mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type", "file"))) {
+            plugin.getLogger().info("玩家数据使用本地文件存储。");
+            return false;
+        }
+
+        Plugin databasePlugin = plugin.getServer().getPluginManager().getPlugin("database");
+        if (databasePlugin != null && databasePlugin.isEnabled()) {
+            try {
+                databaseClient = DatabaseApiClient.create();
+                if (databaseClient != null) {
+                    plugin.getLogger().info("已接入 database 统一 MySQL 服务，所有 SQL 将异步执行。");
+                    return true;
+                }
+                plugin.getLogger().warning("database 插件的 MySQL 未启用，将使用内置 HikariCP。");
+            } catch (LinkageError | RuntimeException error) {
+                plugin.getLogger().warning("database 软依赖不可用，将使用内置 HikariCP: " + error.getMessage());
+            }
+        } else {
+            plugin.getLogger().info("未找到 database 软依赖，将使用内置 HikariCP。");
+        }
 
         try {
-            // 增加参数以确保兼容性
-            String jdbcUrl = String.format(
-                    "jdbc:mysql://%s:%d/%s" +
-                            "?serverTimezone=%s" +
-                            "&useSSL=%b" +
-                            "&allowPublicKeyRetrieval=true" +
-                            "&characterEncoding=utf-8" +
-                            "&rewriteBatchedStatements=true",
-                    host, port, database, timeZone, useSSL
-            );
-
-            HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(jdbcUrl);
-            config.setDriverClassName("com.mysql.cj.jdbc.Driver");
-            config.setUsername(username);
-            config.setPassword(password);
-            config.setMaximumPoolSize(plugin.getConfig().getInt("database.pool_size", 5));
-            config.setMinimumIdle(2);
-            config.setConnectionTimeout(5000);
-
-            dataSource = new HikariDataSource(config);
-            plugin.getLogger().info("MySQL 连接池初始化成功！");
-
-            try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-                // 修复 1: 给 player_rank 加上反引号（虽然 player_rank 本身不是关键字，但 rank 是）
-                stmt.executeUpdate(
-                        "CREATE TABLE IF NOT EXISTS " + tableName + " (" +
-                                "uuid VARCHAR(36) PRIMARY KEY," +
-                                "name VARCHAR(36) DEFAULT ''," +
-                                "kills INT DEFAULT 0," +
-                                "kills_put INT DEFAULT 0," +
-                                "deaths INT DEFAULT 0," +
-                                "games_played INT DEFAULT 0," +
-                                "hunter_wins INT DEFAULT 0," +
-                                "escape_wins INT DEFAULT 0," +
-                                "total_wins INT DEFAULT 0," +
-                                "proficiency DOUBLE DEFAULT 0.0," +
-                                "`rank` VARCHAR(36) DEFAULT ''" +
-                                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
-                );
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().severe("MySQL 初始化失败！" + e.getMessage());
-            e.printStackTrace();
+            databaseClient = new BuiltInMySqlClient(plugin.getConfig());
+            plugin.getLogger().info("内置 HikariCP 初始化成功，所有 SQL 将在专用数据库线程执行。");
+            return true;
+        } catch (RuntimeException | LinkageError error) {
+            plugin.getLogger().severe("内置 MySQL 初始化失败，已回退到本地文件存储: " + error.getMessage());
+            return false;
         }
     }
 
-    private void setupFileStorage() {
-        dataFile = new File(plugin.getDataFolder(), plugin.getConfig().getString("database.file_path", "player_data.yml"));
+    private CompletableFuture<Void> initializeMySql() {
+        String createTableSql = "CREATE TABLE IF NOT EXISTS " + tableName + " (" +
+                "uuid VARCHAR(36) PRIMARY KEY COMMENT '玩家 UUID'," +
+                "name VARCHAR(36) DEFAULT '' COMMENT '玩家名称'," +
+                "kills_put INT DEFAULT 0 COMMENT '总击杀数'," +
+                "deaths INT DEFAULT 0 COMMENT '死亡次数'," +
+                "games_played INT DEFAULT 0 COMMENT '游玩次数'," +
+                "hunter_wins INT DEFAULT 0 COMMENT '猎人胜场'," +
+                "escape_wins INT DEFAULT 0 COMMENT '逃生者胜场'," +
+                "total_wins INT DEFAULT 0 COMMENT '总胜场'," +
+                "proficiency DOUBLE DEFAULT 0.0 COMMENT '熟练度'," +
+                "`rank` VARCHAR(36) DEFAULT '' COMMENT '段位'" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='HunterGame 玩家统计';";
+
+        return databaseClient.execute(createTableSql, Collections.emptyList())
+                .thenCompose(ignored -> databaseClient.query("SELECT * FROM " + tableName, Collections.emptyList()))
+                .thenAccept(rows -> {
+                    for (Map<String, Object> row : rows) {
+                        UUID uuid = UUID.fromString(String.valueOf(row.get("uuid")));
+                        PlayerStats persisted = PlayerStats.fromRow(row);
+                        statsCache.merge(uuid, persisted, PlayerStats::mergePersistedBase);
+                    }
+                    plugin.getLogger().info("已异步加载 " + rows.size() + " 条玩家统计数据。");
+                })
+                .whenComplete((ignored, error) -> {
+                    if (error != null) {
+                        plugin.getLogger().severe("初始化统一数据库失败: " + messageOf(error));
+                    }
+                });
+    }
+
+    private void loadFileStorage() {
         if (!dataFile.exists()) {
             try {
-                dataFile.getParentFile().mkdirs();
+                File parent = dataFile.getParentFile();
+                if (parent != null) parent.mkdirs();
                 dataFile.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException error) {
+                plugin.getLogger().severe("创建玩家数据文件失败: " + error.getMessage());
+                return;
             }
         }
-        fileConfig = YamlConfiguration.loadConfiguration(dataFile);
+
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(dataFile);
+        for (String key : config.getKeys(false)) {
+            try {
+                UUID uuid = UUID.fromString(key);
+                statsCache.put(uuid, PlayerStats.fromConfig(config, key));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore non-player top-level keys left by older configurations.
+            }
+        }
+    }
+
+    public boolean isUsingUnifiedDatabase() {
+        return unifiedDatabase;
+    }
+
+    public CompletableFuture<Void> ready() {
+        return readyFuture;
+    }
+
+    public CompletableFuture<List<Map<String, Object>>> queryAsync(String sql, List<Object> params) {
+        if (!unifiedDatabase) return failedFuture(new IllegalStateException("统一 MySQL 未启用"));
+        return readyFuture.thenCompose(ignored -> databaseClient.query(sql, safeParams(params)));
+    }
+
+    public CompletableFuture<Integer> executeAsync(String sql, List<Object> params) {
+        if (!unifiedDatabase) return failedFuture(new IllegalStateException("统一 MySQL 未启用"));
+        return readyFuture.thenCompose(ignored -> databaseClient.execute(sql, safeParams(params)));
+    }
+
+    public CompletableFuture<Void> transactionAsync(UnifiedDatabaseClient.TransactionAction action) {
+        if (!unifiedDatabase) return failedFuture(new IllegalStateException("统一 MySQL 未启用"));
+        return readyFuture.thenCompose(ignored -> databaseClient.transaction(action));
+    }
+
+    public CompletableFuture<Void> resetSeasonalDataAsync() {
+        return enqueueWrite(() -> {
+            for (PlayerStats stats : statsCache.values()) {
+                stats.proficiency = 0.0;
+                stats.rank = "";
+            }
+            if (unifiedDatabase) {
+                return databaseClient.execute(
+                        "UPDATE " + tableName + " SET proficiency = 0.0, `rank` = ''",
+                        Collections.emptyList()
+                );
+            }
+            return saveFileSnapshotAsync();
+        });
     }
 
     public void resetSeasonalData() {
-        if ("mysql".equalsIgnoreCase(databaseType) && dataSource != null) {
-            // 修复 2: 关键字增加反引号
-            String sql = "UPDATE " + tableName + " SET proficiency = 0.0, `rank` = ''";
-            try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.executeUpdate();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        } else if ("file".equalsIgnoreCase(databaseType) && fileConfig != null) {
-            Set<String> keys = fileConfig.getKeys(false);
-            for (String uuidStr : keys) {
-                if (isValidUUID(uuidStr)) {
-                    fileConfig.set(uuidStr + ".proficiency", 0.0);
-                    fileConfig.set(uuidStr + ".rank", ""); // 修复 3: 修正变量名错误
-                }
-            }
-            saveFileConfig();
-        }
+        resetSeasonalDataAsync();
     }
 
-    // --- 数据操作方法 ---
-
     public void addKill(UUID playerId) {
-        killCache.put(playerId, killCache.getOrDefault(playerId, 0) + 1);
+        killCache.merge(playerId, 1, Integer::sum);
     }
 
     public int getKills(UUID playerId) {
@@ -159,263 +210,304 @@ public class DataStorageManager {
     }
 
     public void addKillput(UUID playerId, String playerName) {
-        String key = playerId.toString() + ".kills_put";
-        int newValue = getValue(playerId, "kills_put") + 1;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, playerName, "kills_put", newValue);
-        } else {
-            fileConfig.set(playerId.toString() + ".name", playerName);
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
+        mutate(playerId, playerName, stats -> stats.killsPut++, "kills_put");
     }
 
     public int getKillsput(UUID playerId) {
-        return getValue(playerId, "kills_put");
+        return stats(playerId).killsPut;
     }
 
     public void addDeath(UUID playerId, Player player) {
-        String key = playerId.toString() + ".deaths";
-        int newValue = getValue(playerId, "deaths") + 1;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "deaths", newValue);
-        } else {
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
+        mutate(playerId, player.getName(), stats -> stats.deaths++, "deaths");
     }
 
     public int getDeaths(UUID playerId) {
-        return getValue(playerId, "deaths");
+        return stats(playerId).deaths;
     }
 
     public void addGamePlayed(UUID playerId, Player player) {
-        String key = playerId.toString() + ".games_played";
-        int newValue = getValue(playerId, "games_played") + 1;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "games_played", newValue);
-        } else {
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
+        mutate(playerId, player.getName(), stats -> stats.gamesPlayed++, "games_played");
     }
 
     public int getGamesPlayed(UUID playerId) {
-        return getValue(playerId, "games_played");
+        return stats(playerId).gamesPlayed;
     }
 
     public void addHunterWin(UUID playerId, Player player) {
-        String key = playerId.toString() + ".hunter_wins";
-        int newValue = getValue(playerId, "hunter_wins") + 1;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "hunter_wins", newValue);
-        } else {
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
-        saveTotalWins(playerId, player);
+        mutate(playerId, player.getName(), stats -> {
+            stats.hunterWins++;
+            stats.totalWins = stats.hunterWins + stats.escapeWins;
+        }, "hunter_wins", "total_wins");
     }
 
     public int getHunterWin(UUID playerId) {
-        return getValue(playerId, "hunter_wins");
+        return stats(playerId).hunterWins;
     }
 
     public void addEscapeWin(UUID playerId, Player player) {
-        String key = playerId.toString() + ".escape_wins";
-        int newValue = getValue(playerId, "escape_wins") + 1;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "escape_wins", newValue);
-        } else {
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
-        saveTotalWins(playerId, player);
+        mutate(playerId, player.getName(), stats -> {
+            stats.escapeWins++;
+            stats.totalWins = stats.hunterWins + stats.escapeWins;
+        }, "escape_wins", "total_wins");
     }
 
     public int getEscapeWin(UUID playerId) {
-        return getValue(playerId, "escape_wins");
+        return stats(playerId).escapeWins;
     }
 
     public void saveTotalWins(UUID playerId, Player player) {
-        int totalWins = getEscapeWin(playerId) + getHunterWin(playerId);
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "total_wins", totalWins);
-        } else {
-            String key = playerId.toString() + ".total_wins";
-            fileConfig.set(key, totalWins);
-            saveFileConfig();
-        }
+        mutate(playerId, player.getName(), stats -> stats.totalWins = stats.hunterWins + stats.escapeWins, "total_wins");
     }
 
     public int getTotalWins(UUID playerId) {
-        return getEscapeWin(playerId) + getHunterWin(playerId);
+        return stats(playerId).totalWins;
     }
 
     public void addProficiency(Player player, double count) {
         UUID playerId = player.getUniqueId();
-        double newValue = getProficiency(player) + count;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "proficiency", newValue);
-        } else {
-            String key = playerId.toString() + ".proficiency";
-            fileConfig.set(key, newValue);
-            saveFileConfig();
-        }
+        mutate(playerId, player.getName(), stats -> stats.proficiency += count, "proficiency");
     }
 
     public double getProficiency(Player player) {
-        UUID playerId = player.getUniqueId();
-        double proficiency = 0.0;
-
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            String sql = "SELECT proficiency FROM " + tableName + " WHERE uuid = ?";
-            try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setString(1, playerId.toString());
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) {
-                    proficiency = rs.getDouble("proficiency");
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        } else {
-            String key = playerId.toString() + ".proficiency";
-            proficiency = fileConfig.getDouble(key, 0.0);
-        }
-        return new BigDecimal(proficiency).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        return getProficiency(player.getUniqueId());
     }
-    
+
+    public double getProficiency(UUID playerId) {
+        return new BigDecimal(stats(playerId).proficiency).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
     public void addRank(UUID playerId, Player player) {
-        double proficiency = getProficiency(player);
-        String rankName = plugin.getRankManager().getRankName(proficiency);
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            updateDatabase(playerId, player, "rank", rankName);
-        } else {
-            fileConfig.set(playerId.toString() + ".rank", rankName);
-            saveFileConfig();
-        }
-    }
-
-    /**
-     * 核心修复：通用的更新数据库方法
-     * 增加了对 column 的反引号包裹，防止 rank 等关键字导致语法错误
-     */
-    private void updateDatabase(UUID uuid, Player player, String column, Object value) {
-        updateDatabase(uuid, player.getName(), column, value);
-    }
-
-    private void updateDatabase(UUID uuid, String playerName, String column, Object value) {
-        if (dataSource == null) return;
-
-        // 修复 4: 关键点！给 `" + column + "` 增加了反引号包裹
-        String sql = "INSERT INTO " + tableName + " (uuid, name, `" + column + "`) VALUES (?, ?, ?) "
-                + "ON DUPLICATE KEY UPDATE name = VALUES(name), `" + column + "` = VALUES(`" + column + "`)";
-
-        try (Connection conn = getConnection(); PreparedStatement statement = conn.prepareStatement(sql)) {
-            statement.setString(1, uuid.toString());
-            statement.setString(2, playerName);
-
-            if (value instanceof Integer) statement.setInt(3, (Integer) value);
-            else if (value instanceof Double) statement.setDouble(3, (Double) value);
-            else if (value instanceof String) statement.setString(3, (String) value);
-
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            plugin.getLogger().severe("更新数据库失败 for player " + uuid + " (" + playerName + ")");
-            e.printStackTrace();
-        }
-    }
-
-    private int getValue(UUID playerId, String field) {
-        if ("mysql".equalsIgnoreCase(databaseType)) {
-            // 修复 5: 查询语句也增加反引号
-            String sql = "SELECT `" + field + "` FROM " + tableName + " WHERE uuid = ?";
-            try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setString(1, playerId.toString());
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) return rs.getInt(field);
-            } catch (SQLException ignored) {}
-        } else {
-            return fileConfig.getInt(playerId.toString() + "." + field, 0);
-        }
-        return 0;
-    }
-
-    private void saveFileConfig() {
-        if (fileConfig == null || dataFile == null) {
-            return;
-        }
-
-        fileDirty = true;
-        if (fileSaveTaskId != -1) {
-            return;
-        }
-
-        fileSaveTaskId = plugin.getServer().getScheduler().runTaskLater(plugin, this::flushFileConfig, 20L).getTaskId();
-    }
-
-    private void flushFileConfig() {
-        if (!fileDirty || fileConfig == null || dataFile == null) {
-            fileSaveTaskId = -1;
-            return;
-        }
-
-        try {
-            fileConfig.save(dataFile);
-            fileDirty = false;
-        } catch (IOException e) {
-            plugin.getLogger().severe("保存玩家数据失败: " + e.getMessage());
-        } finally {
-            fileSaveTaskId = -1;
-        }
-    }
-
-    public Connection getConnection() throws SQLException {
-        if (dataSource == null) throw new SQLException("数据源未初始化。");
-        return dataSource.getConnection();
-    }
-
-    private boolean isValidUUID(String uuidStr) {
-        try { UUID.fromString(uuidStr); return true; } catch (Exception e) { return false; }
+        String playerName = player.getName();
+        mutate(playerId, playerName,
+                stats -> stats.rank = plugin.getRankManager().getRankName(stats.proficiency), "rank");
     }
 
     public Map<UUID, Integer> getAllPlayerTiers() {
+        List<Map.Entry<UUID, PlayerStats>> sorted = new ArrayList<>(statsCache.entrySet());
+        sorted.removeIf(entry -> entry.getValue().proficiency <= 0.0);
+        sorted.sort(Comparator.comparingDouble((Map.Entry<UUID, PlayerStats> entry) -> entry.getValue().proficiency).reversed());
+
         Map<UUID, Integer> tiers = new HashMap<>();
-        if ("mysql".equalsIgnoreCase(databaseType) && dataSource != null) {
-            String sql = "SELECT uuid, RANK() OVER (ORDER BY proficiency DESC) AS tier FROM " + tableName + " WHERE proficiency > 0";
-            try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) tiers.put(UUID.fromString(rs.getString("uuid")), rs.getInt("tier"));
-            } catch (SQLException e) { e.printStackTrace(); }
-        } else if (fileConfig != null) {
-            Map<UUID, Double> profMap = new HashMap<>();
-            for (String key : fileConfig.getKeys(false)) {
-                if (isValidUUID(key)) {
-                    double prof = fileConfig.getDouble(key + ".proficiency", 0.0);
-                    if (prof > 0) profMap.put(UUID.fromString(key), prof);
-                }
-            }
-            java.util.List<Map.Entry<UUID, Double>> sorted = new java.util.ArrayList<>(profMap.entrySet());
-            sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-            int rank = 1;
-            for (Map.Entry<UUID, Double> entry : sorted) tiers.put(entry.getKey(), rank++);
-        }
+        int tier = 1;
+        for (Map.Entry<UUID, PlayerStats> entry : sorted) tiers.put(entry.getKey(), tier++);
         return tiers;
     }
 
-    public void shutdown() {
-        if (fileSaveTaskId != -1) {
-            plugin.getServer().getScheduler().cancelTask(fileSaveTaskId);
-            fileSaveTaskId = -1;
+    private void mutate(UUID uuid, String playerName, StatsMutation mutation, String... fields) {
+        PlayerStats stats = statsCache.computeIfAbsent(uuid, ignored -> new PlayerStats());
+        synchronized (stats) {
+            stats.name = playerName == null ? stats.name : playerName;
+            mutation.apply(stats);
         }
-        flushFileConfig();
-        if (dataSource != null && !dataSource.isClosed()) dataSource.close();
+        enqueueWrite(() -> {
+            PlayerStats snapshot;
+            synchronized (stats) {
+                snapshot = stats.copy();
+            }
+            return unifiedDatabase ? persistMySql(uuid, snapshot, fields) : saveFileSnapshotAsync();
+        });
+    }
+
+    private CompletableFuture<Integer> persistMySql(UUID uuid, PlayerStats stats, String... fields) {
+        StringBuilder columns = new StringBuilder("uuid, name");
+        StringBuilder placeholders = new StringBuilder("?, ?");
+        StringBuilder updates = new StringBuilder("name = VALUES(name)");
+        List<Object> params = new ArrayList<>();
+        params.add(uuid.toString());
+        params.add(stats.name);
+
+        for (String field : fields) {
+            columns.append(", `").append(field).append('`');
+            placeholders.append(", ?");
+            updates.append(", `").append(field).append("` = VALUES(`").append(field).append("`)");
+            params.add(stats.value(field));
+        }
+
+        String sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + placeholders + ") " +
+                "ON DUPLICATE KEY UPDATE " + updates;
+        return databaseClient.execute(sql, params);
+    }
+
+    private CompletableFuture<Void> saveFileSnapshotAsync() {
+        Map<UUID, PlayerStats> snapshot = new HashMap<>();
+        for (Map.Entry<UUID, PlayerStats> entry : statsCache.entrySet()) {
+            snapshot.put(entry.getKey(), entry.getValue().copy());
+        }
+
+        return CompletableFuture.runAsync(() -> {
+            YamlConfiguration config = new YamlConfiguration();
+            for (Map.Entry<UUID, PlayerStats> entry : snapshot.entrySet()) {
+                String key = entry.getKey().toString();
+                PlayerStats stats = entry.getValue();
+                config.set(key + ".name", stats.name);
+                for (String field : PERSISTED_FIELDS) config.set(key + "." + field, stats.value(field));
+            }
+            try {
+                config.save(dataFile);
+            } catch (IOException error) {
+                throw new IllegalStateException("保存玩家数据失败", error);
+            }
+        }, fileExecutor);
+    }
+
+    private CompletableFuture<Void> enqueueWrite(Supplier<CompletableFuture<?>> operation) {
+        synchronized (writeLock) {
+            if (shuttingDown) return CompletableFuture.completedFuture(null);
+            writeTail = writeTail.handle((ignored, previousError) -> null)
+                    .thenCompose(ignored -> operation.get())
+                    .handle((ignored, error) -> {
+                        if (error != null) plugin.getLogger().severe("异步保存玩家数据失败: " + messageOf(error));
+                        return null;
+                    });
+            return writeTail;
+        }
+    }
+
+    public void shutdown() {
+        CompletableFuture<Void> pending;
+        synchronized (writeLock) {
+            shuttingDown = true;
+            pending = writeTail;
+        }
+        try {
+            pending.get(5, TimeUnit.SECONDS);
+        } catch (Exception error) {
+            plugin.getLogger().warning("等待玩家数据写入完成时超时: " + messageOf(error));
+        }
+        fileExecutor.shutdown();
+        try {
+            if (!fileExecutor.awaitTermination(5, TimeUnit.SECONDS)) fileExecutor.shutdownNow();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            fileExecutor.shutdownNow();
+        }
+        if (databaseClient != null) databaseClient.close();
+    }
+
+    private PlayerStats stats(UUID uuid) {
+        return statsCache.getOrDefault(uuid, PlayerStats.EMPTY);
+    }
+
+    private List<Object> safeParams(List<Object> params) {
+        return params == null ? Collections.emptyList() : params;
+    }
+
+    private String sanitizeIdentifier(String identifier) {
+        if (identifier == null || !identifier.matches("[A-Za-z0-9_]+")) {
+            throw new IllegalArgumentException("非法 MySQL 表名: " + identifier);
+        }
+        return identifier;
+    }
+
+    private String messageOf(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) current = current.getCause();
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
+    }
+
+    private static <T> CompletableFuture<T> failedFuture(Throwable error) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(error);
+        return future;
+    }
+
+    @FunctionalInterface
+    private interface StatsMutation {
+        void apply(PlayerStats stats);
+    }
+
+    private static final class PlayerStats {
+        private static final PlayerStats EMPTY = new PlayerStats();
+
+        private volatile String name = "";
+        private volatile int killsPut;
+        private volatile int deaths;
+        private volatile int gamesPlayed;
+        private volatile int hunterWins;
+        private volatile int escapeWins;
+        private volatile int totalWins;
+        private volatile double proficiency;
+        private volatile String rank = "";
+
+        private static PlayerStats fromRow(Map<String, Object> row) {
+            PlayerStats stats = new PlayerStats();
+            stats.name = valueOrEmpty(row.get("name"));
+            stats.killsPut = number(row.get("kills_put")).intValue();
+            stats.deaths = number(row.get("deaths")).intValue();
+            stats.gamesPlayed = number(row.get("games_played")).intValue();
+            stats.hunterWins = number(row.get("hunter_wins")).intValue();
+            stats.escapeWins = number(row.get("escape_wins")).intValue();
+            stats.totalWins = number(row.get("total_wins")).intValue();
+            stats.proficiency = number(row.get("proficiency")).doubleValue();
+            stats.rank = valueOrEmpty(row.get("rank"));
+            return stats;
+        }
+
+        private static PlayerStats fromConfig(YamlConfiguration config, String key) {
+            PlayerStats stats = new PlayerStats();
+            stats.name = config.getString(key + ".name", "");
+            stats.killsPut = config.getInt(key + ".kills_put");
+            stats.deaths = config.getInt(key + ".deaths");
+            stats.gamesPlayed = config.getInt(key + ".games_played");
+            stats.hunterWins = config.getInt(key + ".hunter_wins");
+            stats.escapeWins = config.getInt(key + ".escape_wins");
+            stats.totalWins = config.getInt(key + ".total_wins", stats.hunterWins + stats.escapeWins);
+            stats.proficiency = config.getDouble(key + ".proficiency");
+            stats.rank = config.getString(key + ".rank", "");
+            return stats;
+        }
+
+        private Object value(String field) {
+            switch (field) {
+                case "kills_put": return killsPut;
+                case "deaths": return deaths;
+                case "games_played": return gamesPlayed;
+                case "hunter_wins": return hunterWins;
+                case "escape_wins": return escapeWins;
+                case "total_wins": return totalWins;
+                case "proficiency": return proficiency;
+                case "rank": return rank;
+                default: throw new IllegalArgumentException("未知玩家数据字段: " + field);
+            }
+        }
+
+        private PlayerStats copy() {
+            PlayerStats copy = new PlayerStats();
+            copy.name = name;
+            copy.killsPut = killsPut;
+            copy.deaths = deaths;
+            copy.gamesPlayed = gamesPlayed;
+            copy.hunterWins = hunterWins;
+            copy.escapeWins = escapeWins;
+            copy.totalWins = totalWins;
+            copy.proficiency = proficiency;
+            copy.rank = rank;
+            return copy;
+        }
+
+        private PlayerStats mergePersistedBase(PlayerStats persisted) {
+            synchronized (this) {
+                killsPut += persisted.killsPut;
+                deaths += persisted.deaths;
+                gamesPlayed += persisted.gamesPlayed;
+                hunterWins += persisted.hunterWins;
+                escapeWins += persisted.escapeWins;
+                totalWins = hunterWins + escapeWins;
+                proficiency += persisted.proficiency;
+                if (name.isEmpty()) name = persisted.name;
+                if (rank.isEmpty()) rank = persisted.rank;
+                return this;
+            }
+        }
+
+        private static Number number(Object value) {
+            if (value instanceof Number) return (Number) value;
+            if (value == null) return 0;
+            return new BigDecimal(String.valueOf(value));
+        }
+
+        private static String valueOrEmpty(Object value) {
+            return value == null ? "" : String.valueOf(value);
+        }
     }
 }
-

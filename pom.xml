@@ -71,9 +71,22 @@
 
   <dependencies>
       <dependency>
+          <groupId>com.xigua</groupId>
+          <artifactId>database</artifactId>
+          <version>1.0-SNAPSHOT</version>
+          <scope>system</scope>
+          <systemPath>${project.basedir}/../database-1.0-SNAPSHOT.jar</systemPath>
+      </dependency>
+      <dependency>
           <groupId>com.zaxxer</groupId>
           <artifactId>HikariCP</artifactId>
           <version>5.0.1</version>
+          <scope>provided</scope>
+      </dependency>
+      <dependency>
+          <groupId>com.mysql</groupId>
+          <artifactId>mysql-connector-j</artifactId>
+          <version>8.4.0</version>
           <scope>provided</scope>
       </dependency>
       <dependency>

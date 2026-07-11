@@ -34,6 +34,7 @@ com\huntergame\data\DataStorageManager.class
 com\huntergame\skill\skills\BlinkSkill.class
 com\huntergame\spectator\SpectatorService.class
 com\huntergame\message\MessageBroadcaster$1.class
+com\huntergame\data\DataStorageManager$StatsMutation.class
 com\huntergame\crafting\PermissionRecipeManager$RecipeBookHolder.class
 com\huntergame\world\OnlineWorldResetManager.class
 com\huntergame\profession\FinalBattleProfessionManager$ProfessionRole.class
@@ -41,6 +42,7 @@ com\huntergame\skill\skills\DashSkill.class
 com\huntergame\crafting\PermissionRecipeManager$RecipeDetailHolder.class
 com\huntergame\listener\DragonFightListener.class
 com\huntergame\gui\TrackingGUI.class
+com\huntergame\data\DatabaseApiClient.class
 com\huntergame\role\RoleSelectionHandler.class
 com\huntergame\bedrock\BedrockTrackingGUI.class
 com\huntergame\session\DisconnectProtectionService.class
@@ -58,8 +60,10 @@ com\huntergame\game\FinalBattleManager$1.class
 com\huntergame\gui\RoleSelectionGUI.class
 com\huntergame\placeholder\HunterGamePlaceholder.class
 com\huntergame\world\OreConfig$OreSettings.class
+com\huntergame\data\DataStorageManager$PlayerStats.class
 com\huntergame\HunterGame.class
 com\huntergame\scoreboard\HunterScoreboardManager$ScoreboardContext.class
+com\huntergame\data\UnifiedDatabaseClient$TransactionAction.class
 com\huntergame\motd\MotdListener.class
 com\huntergame\rank\SeasonManager.class
 com\huntergame\skill\skills\LavaWalkerSkill.class
@@ -72,6 +76,7 @@ com\huntergame\listener\VanillaHunterGameplayListener.class
 com\huntergame\listener\ServerSelectorListener.class
 com\huntergame\listener\WaitingLobbyListener.class
 com\huntergame\skill\skills\KnockbackFieldSkill.class
+com\huntergame\data\UnifiedDatabaseClient$Transaction.class
 com\huntergame\crafting\PermissionRecipeManager.class
 com\huntergame\profession\FinalBattleProfessionManager$Profession.class
 com\huntergame\bedrock\BedrockRoleSelectionGUI$1.class
@@ -107,9 +112,11 @@ com\huntergame\combat\LastDamageTracker$DamageCredit.class
 com\huntergame\listener\ChatActivityListener.class
 com\huntergame\game\EscaperQuitCountdown.class
 com\huntergame\skill\skills\DemolitionExpertSkill.class
+com\huntergame\data\BuiltInMySqlClient.class
 com\huntergame\skill\skills\AdrenalineBurstSkill.class
 com\huntergame\world\OreConfig.class
 com\huntergame\skill\skills\DoubleJumpSkill$1.class
+com\huntergame\data\UnifiedDatabaseClient.class
 com\huntergame\skill\skills\FreezeSpellSkill.class
 com\huntergame\skill\skills\FreezeSkill$FreezeData.class
 com\huntergame\skill\skills\WallPhaseSkill$InventorySnapshot.class

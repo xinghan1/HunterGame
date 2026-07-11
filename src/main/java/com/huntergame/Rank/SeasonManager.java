@@ -13,8 +13,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 public class SeasonManager implements Listener {
     private final HunterGame plugin;
@@ -39,13 +39,8 @@ public class SeasonManager implements Listener {
         loadSeasonRewards();
 
         if (isUsingMySQL()) {
-            initializeTables();
-            // 从数据库加载当前赛季ID
-            this.currentSeasonId = getCurrentSeasonIdFromDB();
-            if (this.currentSeasonId == null || this.currentSeasonId.isEmpty()) {
-                this.currentSeasonId = "S1";
-                saveCurrentSeasonIdToDB(this.currentSeasonId);
-            }
+            this.currentSeasonId = "S1";
+            initializeDatabaseAsync();
         } else {
             this.currentSeasonId = getCurrentSeasonIdFromFile();
             if (this.currentSeasonId == null || this.currentSeasonId.isEmpty()) {
@@ -59,80 +54,58 @@ public class SeasonManager implements Listener {
     /**
      * 开始一个新的赛季
      */
-    public boolean startNewSeason(String newSeasonId) {
+    public CompletableFuture<Boolean> startNewSeasonAsync(String newSeasonId) {
         if (newSeasonId == null || newSeasonId.trim().isEmpty()) {
             plugin.getLogger().warning("尝试使用空赛季ID开始新赛季！");
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
-        newSeasonId = newSeasonId.trim();
+        String seasonId = newSeasonId.trim();
 
-        plugin.getLogger().info("正在准备新赛季: " + newSeasonId);
+        plugin.getLogger().info("正在准备新赛季: " + seasonId);
 
-        // 1. 检查赛季ID是否已存在
-        if (isSeasonIdExists(newSeasonId)) {
-            plugin.getLogger().severe("无法开始新赛季！赛季ID '" + newSeasonId + "' 已存在。");
-            return false;
-        }
-
-        // 重置所有玩家的赛季数据 (熟练度和段位)
-        dataStorageManager.resetSeasonalData();
-
-        // 更新赛季ID并重置领取状态
         if (isUsingMySQL()) {
-            try (Connection conn = dataStorageManager.getConnection()) {
-                conn.setAutoCommit(false);
-
-                // a. 插入新赛季的系统记录
-                String insertSql = "INSERT INTO season_info (season_id, player_uuid, season_start_time) VALUES (?, 'system', NOW())";
-                try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
-                    pstmt.setString(1, newSeasonId);
-                    pstmt.executeUpdate();
+            return isSeasonIdExistsAsync(seasonId).thenCompose(exists -> {
+                if (exists) {
+                    plugin.getLogger().severe("无法开始新赛季！赛季ID '" + seasonId + "' 已存在。");
+                    return CompletableFuture.completedFuture(false);
                 }
-
-                // b. 删除上一赛季的系统记录（如果存在）
-                String deleteOldSystemSql = "DELETE FROM season_info WHERE player_uuid = 'system' AND season_id != ?";
-                try (PreparedStatement pstmt = conn.prepareStatement(deleteOldSystemSql)) {
-                    pstmt.setString(1, newSeasonId);
-                    pstmt.executeUpdate();
-                }
-
-                conn.commit(); // 提交事务
-                this.currentSeasonId = newSeasonId;
-            } catch (SQLException e) {
-                plugin.getLogger().severe("新赛季开始时，MySQL 数据库操作失败！");
-                e.printStackTrace();
+                return dataStorageManager.resetSeasonalDataAsync()
+                        .thenCompose(ignored -> dataStorageManager.transactionAsync(transaction -> {
+                            transaction.execute(
+                                    "INSERT INTO season_info (season_id, player_uuid, season_start_time) VALUES (?, 'system', NOW())",
+                                    Collections.singletonList(seasonId)
+                            );
+                            transaction.execute(
+                                    "DELETE FROM season_info WHERE player_uuid = 'system' AND season_id != ?",
+                                    Collections.singletonList(seasonId)
+                            );
+                        }))
+                        .thenApply(ignored -> {
+                            currentSeasonId = seasonId;
+                            plugin.getLogger().info("新赛季 '" + seasonId + "' 已成功开始！");
+                            return true;
+                        });
+            }).exceptionally(error -> {
+                plugin.getLogger().severe("新赛季数据库操作失败: " + messageOf(error));
                 return false;
-            }
-        } else {
-            // 文件存储逻辑
-            this.currentSeasonId = newSeasonId;
-            resetAllClaimedRewardsInFile();
-            saveCurrentSeasonIdToFile(currentSeasonId);
+            });
         }
 
-        plugin.getLogger().info("新赛季 '" + newSeasonId + "' 已成功开始！");
-        return true;
+        dataStorageManager.resetSeasonalData();
+        this.currentSeasonId = seasonId;
+        resetAllClaimedRewardsInFile();
+        saveCurrentSeasonIdToFile(currentSeasonId);
+        plugin.getLogger().info("新赛季 '" + seasonId + "' 已成功开始！");
+        return CompletableFuture.completedFuture(true);
     }
 
     /**
      * 检查一个赛季ID是否已经存在于数据库中
      */
-    private boolean isSeasonIdExists(String seasonId) {
-        if (!isUsingMySQL()) {
-            return false;
-        }
+    private CompletableFuture<Boolean> isSeasonIdExistsAsync(String seasonId) {
         String sql = "SELECT 1 FROM season_info WHERE season_id = ? LIMIT 1";
-        try (Connection conn = dataStorageManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, seasonId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().warning("检查赛季ID '" + seasonId + "' 是否存在时出错！");
-            e.printStackTrace();
-            return true; // 出错时为安全起见，阻止创建
-        }
+        return dataStorageManager.queryAsync(sql, Collections.singletonList(seasonId))
+                .thenApply(rows -> !rows.isEmpty());
     }
 
     /**
@@ -142,55 +115,57 @@ public class SeasonManager implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
+        String playerName = player.getName();
 
-        // 如果玩家是第一次在本赛季加入
-        if (!hasPlayerClaimedSeasonReward(playerId)) {
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                // 获取玩家上赛季的最终熟练度
-                double proficiency = dataStorageManager.getProficiency(player);
-                String rank = rankManager.getRank(proficiency);
-
-                // 执行对应段位的奖励命令
-                if (seasonRewards.containsKey(rank)) {
-                    for (String command : seasonRewards.get(rank)) {
-                        String formattedCommand = command
-                                .replace("%player%", player.getName())
-                                .replace("%rank%", rank)
-                                .replace("%season%", currentSeasonId);
-
-                        Bukkit.getScheduler().runTask(plugin, () ->
-                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), formattedCommand)
-                        );
-                    }
-                    for (String line : plugin.getMessageList("season_reward_message", Arrays.asList(
-                            "&a=====================================",
-                            "&6         新赛季 '%season%' 开始啦！          ",
-                            "&a-------------------------------------",
-                            "&a你的上赛季段位为: &6%rank%",
-                            "&a赛季奖励已自动发放至你的账户！",
-                            "&a赛季努力冲分，可解锁更高级奖励！",
-                            "&a====================================="
-                    ))) {
-                        player.sendMessage(line
-                                .replace("%season%", currentSeasonId)
-                                .replace("%rank%", rank));
-                    }
-                } else {
-                    plugin.getLogger().warning("玩家 " + player.getName() + " 的段位 " + rank + " 没有配置对应的赛季奖励。");
-                }
-
-                // 标记玩家已领取本赛季奖励
-                markPlayerClaimedSeasonReward(playerId);
+        if (isUsingMySQL()) {
+            hasPlayerClaimedSeasonRewardAsync(playerId).thenAccept(claimed -> {
+                if (!claimed) grantSeasonReward(playerId, playerName, dataStorageManager.getProficiency(playerId));
+            }).exceptionally(error -> {
+                plugin.getLogger().warning("检查赛季奖励失败: " + messageOf(error));
+                return null;
             });
+        } else if (!hasPlayerClaimedSeasonRewardFromFile(playerId)) {
+            grantSeasonReward(playerId, playerName, dataStorageManager.getProficiency(playerId));
         }
+    }
+
+    private void grantSeasonReward(UUID playerId, String playerName, double proficiency) {
+        String rank = rankManager.getRank(proficiency);
+        String seasonId = currentSeasonId;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) return;
+
+            List<String> commands = seasonRewards.get(rank);
+            if (commands != null) {
+                for (String command : commands) {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command
+                            .replace("%player%", playerName)
+                            .replace("%rank%", rank)
+                            .replace("%season%", seasonId));
+                }
+                for (String line : plugin.getMessageList("season_reward_message", Arrays.asList(
+                        "&a=====================================",
+                        "&6         新赛季 '%season%' 开始啦！          ",
+                        "&a-------------------------------------",
+                        "&a你的上赛季段位为: &6%rank%",
+                        "&a赛季奖励已自动发放至你的账户！",
+                        "&a赛季努力冲分，可解锁更高级奖励！",
+                        "&a====================================="
+                ))) player.sendMessage(line.replace("%season%", seasonId).replace("%rank%", rank));
+            } else {
+                plugin.getLogger().warning("玩家 " + playerName + " 的段位 " + rank + " 没有配置对应的赛季奖励。");
+            }
+            markPlayerClaimedSeasonReward(playerId);
+        });
     }
 
     // --- 数据库操作方法 ---
     private boolean isUsingMySQL() {
-        return "mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type", "file"));
+        return dataStorageManager.isUsingUnifiedDatabase();
     }
 
-    private void initializeTables() {
+    private void initializeDatabaseAsync() {
         String createTableSQL = "CREATE TABLE IF NOT EXISTS season_info (" +
                 "id INT AUTO_INCREMENT PRIMARY KEY, " +
                 "season_id VARCHAR(50) NOT NULL COMMENT '赛季的唯一ID (例如: S1, 2024_春季)', " +
@@ -200,69 +175,39 @@ public class SeasonManager implements Listener {
                 "UNIQUE KEY unique_season_player (season_id, player_uuid) " +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赛季信息和玩家奖励领取记录表';";
 
-        try (Connection conn = dataStorageManager.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute(createTableSQL);
-        } catch (SQLException e) {
-            plugin.getLogger().severe("创建或初始化 season_info 表失败！");
-            e.printStackTrace();
-        }
+        dataStorageManager.executeAsync(createTableSQL, Collections.emptyList())
+                .thenCompose(ignored -> dataStorageManager.queryAsync(
+                        "SELECT season_id FROM season_info WHERE player_uuid = 'system' LIMIT 1",
+                        Collections.emptyList()))
+                .thenCompose(rows -> {
+                    if (!rows.isEmpty()) {
+                        currentSeasonId = String.valueOf(rows.get(0).get("season_id"));
+                        return CompletableFuture.completedFuture(0);
+                    }
+                    currentSeasonId = "S1";
+                    return dataStorageManager.executeAsync(
+                            "INSERT INTO season_info (season_id, player_uuid) VALUES (?, 'system')",
+                            Collections.singletonList(currentSeasonId));
+                }).thenRun(() -> plugin.getLogger().info("已异步加载当前赛季，赛季ID: " + currentSeasonId))
+                .exceptionally(error -> {
+                    plugin.getLogger().severe("初始化赛季数据库失败: " + messageOf(error));
+                    return null;
+                });
     }
 
-    private String getCurrentSeasonIdFromDB() {
-        String sql = "SELECT season_id FROM season_info WHERE player_uuid = 'system' LIMIT 1";
-        try (Connection conn = dataStorageManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) {
-                return rs.getString("season_id");
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().warning("从数据库读取当前赛季ID失败！");
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private void saveCurrentSeasonIdToDB(String seasonId) {
-        String sql = "INSERT INTO season_info (season_id, player_uuid) VALUES (?, 'system') ON DUPLICATE KEY UPDATE season_id = VALUES(season_id)";
-        try (Connection conn = dataStorageManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, seasonId);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            plugin.getLogger().severe("向数据库保存当前赛季ID失败！");
-            e.printStackTrace();
-        }
-    }
-
-    private boolean hasPlayerClaimedSeasonRewardInDB(UUID playerId) {
+    private CompletableFuture<Boolean> hasPlayerClaimedSeasonRewardAsync(UUID playerId) {
         String sql = "SELECT 1 FROM season_info WHERE season_id = ? AND player_uuid = ? LIMIT 1";
-        try (Connection conn = dataStorageManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, currentSeasonId);
-            pstmt.setString(2, playerId.toString());
-            try (ResultSet rs = pstmt.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().warning("检查玩家 " + playerId + " 是否已领取奖励时数据库出错！");
-            e.printStackTrace();
-            return false;
-        }
+        return dataStorageManager.queryAsync(sql, Arrays.asList(currentSeasonId, playerId.toString()))
+                .thenApply(rows -> !rows.isEmpty());
     }
 
     private void markPlayerClaimedSeasonRewardInDB(UUID playerId) {
         String sql = "INSERT IGNORE INTO season_info (season_id, player_uuid) VALUES (?, ?)";
-        try (Connection conn = dataStorageManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, currentSeasonId);
-            pstmt.setString(2, playerId.toString());
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            plugin.getLogger().severe("标记玩家 " + playerId + " 已领取奖励时数据库出错！");
-            e.printStackTrace();
-        }
+        dataStorageManager.executeAsync(sql, Arrays.asList(currentSeasonId, playerId.toString()))
+                .exceptionally(error -> {
+                    plugin.getLogger().severe("标记玩家 " + playerId + " 已领取奖励时数据库出错: " + messageOf(error));
+                    return 0;
+                });
     }
 
     // --- 文件操作方法 (已修正类型错误) ---
@@ -322,7 +267,7 @@ public class SeasonManager implements Listener {
     // 修正：移除了重复的方法定义
     public boolean hasPlayerClaimedSeasonReward(UUID playerId) {
         if (isUsingMySQL()) {
-            return hasPlayerClaimedSeasonRewardInDB(playerId);
+            return false;
         } else {
             return hasPlayerClaimedSeasonRewardFromFile(playerId);
         }
@@ -339,6 +284,12 @@ public class SeasonManager implements Listener {
     // 获取赛季id
     public String getCurrentSeasonId() {
         return currentSeasonId;
+    }
+
+    private String messageOf(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) current = current.getCause();
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
 
