@@ -46,10 +46,18 @@ public class SafeLocationFinder {
             public void run() {
                 // 1. 超时检测
                 if (secondsPassed >= MAX_SECONDS) {
-                    Location defaultLoc = center.clone();
+                    World fallbackWorld = world != null ? world : center.getWorld();
+                    Location defaultLoc = new Location(
+                            fallbackWorld,
+                            center.getX(),
+                            center.getY(),
+                            center.getZ(),
+                            center.getYaw(),
+                            center.getPitch()
+                    );
                     // 尝试找一个基本的最高点作为保底
-                    if (world != null) {
-                        int highestY = world.getHighestBlockYAt(defaultLoc);
+                    if (fallbackWorld != null) {
+                        int highestY = fallbackWorld.getHighestBlockYAt(defaultLoc);
                         defaultLoc.setY(highestY + 1);
                     }
                     Bukkit.broadcastMessage(plugin.getMessage("location_timeout", "&c搜寻超时，使用默认坐标！"));

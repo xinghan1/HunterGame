@@ -39,7 +39,21 @@ public class CageManager {
      * 为一组玩家在同一地点生成共享屏障笼子（原版猎人模式）
      */
     public void createGroupCage(List<Player> players, Location center) {
+        int releaseSeconds = plugin.getConfig().getInt(
+                "game.vanilla_hunter.cage.release_seconds",
+                plugin.getConfig().getInt("hunter_removeCage", 25)
+        );
+        int delayTicks = Math.max(0, releaseSeconds) * 20;
+        createGroupCage(players, center, delayTicks);
+    }
+
+    public void createGroupCage(List<Player> players, Location center, int delayTicks) {
         if (players == null || players.isEmpty()) return;
+        if (center == null || center.getWorld() == null) return;
+        if (plugin.isProtectedLobbyWorld(center.getWorld())) {
+            plugin.getLogger().warning("已阻止在大厅世界生成经典猎人屏障笼，避免破坏等待大厅。");
+            return;
+        }
 
         Set<Location> cageBlocks = new HashSet<>();
         int radius = 2;
@@ -66,8 +80,6 @@ public class CageManager {
             playerCages.put(player.getUniqueId(), cageBlocks);
         }
 
-        int delayTicks = plugin.getConfig().getInt("hunter_removeCage", 25) * 20;
-
         org.bukkit.scheduler.BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
@@ -85,16 +97,9 @@ public class CageManager {
                     playerCages.remove(player.getUniqueId());
                 }
                 grantVanillaEscaperStartSpeed(players);
-                // 广播开始标题
-                for (org.bukkit.entity.Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    online.sendTitle(
-                            plugin.getMessage("cage_start_title", "&a开始！"),
-                            plugin.getMessage("cage_start_subtitle", ""),
-                            5, 40, 15
-                    );
-                }
+                sendCageReleaseTitle(players);
             }
-        }.runTaskLater(plugin, delayTicks);
+        }.runTaskLater(plugin, Math.max(0, delayTicks));
         groupTaskIds.add(task.getTaskId());
     }
 
@@ -106,6 +111,18 @@ public class CageManager {
         for (Player player : players) {
             if (player != null && player.isOnline() && plugin.isEscaper(player.getUniqueId())) {
                 player.addPotionEffect(speedBoost, true);
+            }
+        }
+    }
+
+    private void sendCageReleaseTitle(List<Player> players) {
+        for (Player player : players) {
+            if (player != null && player.isOnline()) {
+                player.sendTitle(
+                        plugin.getMessage("cage_start_title", "&a开始！"),
+                        plugin.getMessage("cage_start_subtitle", ""),
+                        5, 40, 15
+                );
             }
         }
     }

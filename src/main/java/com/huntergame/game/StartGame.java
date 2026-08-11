@@ -470,19 +470,33 @@ public class StartGame implements Listener {
         World world = Bukkit.getWorld("world");
         Location center = world.getSpawnLocation();
 
-        // 原版猎人：所有玩家传送到同一地点，关在同一屏障笼子里
+        // 原版猎人：逃生者和猎人分开笼子，逃生者先放出，猎人延后放出
         plugin.setPvpLocked(true);
         locationFinder.findLocation(world, center, 100, 1000, (spawnLocation) -> {
-            // 将原版猎人开局屏障整体上抬 2 格，避免笼子与地形重叠
-            Location cageCenter = spawnLocation.clone().add(0, 2, 0);
-            List<Player> allPlayers = new ArrayList<>(Bukkit.getOnlinePlayers());
-            for (Player player : allPlayers) {
-                player.teleport(cageCenter);
+            spawnLocation = normalizeVanillaHunterSpawnLocation(world, spawnLocation);
+            Location escaperCageCenter = spawnLocation.clone().add(0, 2, 0);
+            Location hunterCageCenter = getVanillaHunterCageCenter(world, escaperCageCenter);
+            List<Player> escapers = new ArrayList<>(assignedEscapers);
+            List<Player> hunters = new ArrayList<>(assignedHunters);
+
+            for (Player escaper : escapers) {
+                if (escaper != null && escaper.isOnline()) {
+                    escaper.teleport(escaperCageCenter);
+                }
             }
+            for (Player hunter : hunters) {
+                if (hunter != null && hunter.isOnline()) {
+                    hunter.teleport(hunterCageCenter);
+                }
+            }
+
+            int escaperReleaseDelayTicks = getVanillaHunterEscaperReleaseDelayTicks();
+            int hunterExtraDelayTicks = getVanillaHunterHunterReleaseExtraDelayTicks();
             world.setSpawnLocation(spawnLocation);
             broadcastPlayerCounts();
             plugin.setGameInProgress(true);
-            plugin.glassCageManager.createGroupCage(allPlayers, cageCenter);
+            plugin.glassCageManager.createGroupCage(escapers, escaperCageCenter, escaperReleaseDelayTicks);
+            plugin.glassCageManager.createGroupCage(hunters, hunterCageCenter, escaperReleaseDelayTicks + hunterExtraDelayTicks);
             plugin.setPvpLocked(false);
         });
 
@@ -501,6 +515,39 @@ public class StartGame implements Listener {
             Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_hunter_objective", "&7• 猎人目标：击杀全部逃生者 •"));
         }
         broadcastTeamRatio();
+    }
+
+    private Location normalizeVanillaHunterSpawnLocation(World world, Location spawnLocation) {
+        if (spawnLocation != null && world.equals(spawnLocation.getWorld())
+                && !plugin.isProtectedLobbyWorld(spawnLocation.getWorld())) {
+            return spawnLocation;
+        }
+
+        Location fallback = world.getSpawnLocation().clone();
+        int highestY = world.getHighestBlockYAt(fallback);
+        fallback.setY(highestY + 1);
+        plugin.getLogger().warning("经典猎人安全位置回调不是 world，已强制使用 world 世界出生点作为兜底。");
+        return fallback;
+    }
+
+    private Location getVanillaHunterCageCenter(World world, Location escaperCageCenter) {
+        Location hunterCageCenter = escaperCageCenter.clone().add(10, 0, 0);
+        int highestY = world.getHighestBlockYAt(hunterCageCenter);
+        hunterCageCenter.setY(highestY + 3);
+        return hunterCageCenter;
+    }
+
+    private int getVanillaHunterEscaperReleaseDelayTicks() {
+        int releaseSeconds = plugin.getConfig().getInt(
+                "game.vanilla_hunter.cage.release_seconds",
+                plugin.getConfig().getInt("hunter_removeCage", 25)
+        );
+        return Math.max(0, releaseSeconds) * 20;
+    }
+
+    private int getVanillaHunterHunterReleaseExtraDelayTicks() {
+        int extraSeconds = plugin.getConfig().getInt("game.vanilla_hunter.cage.hunter_extra_release_seconds", 10);
+        return Math.max(0, extraSeconds) * 20;
     }
 
     /**

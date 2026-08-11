@@ -33,6 +33,8 @@ public class SetLobbyCommand {
         plugin.getConfig().set("lobby.y", location.getY());
         plugin.getConfig().set("lobby.z", location.getZ());
         plugin.saveConfig();
+        plugin.loadConfig();
+        plugin.applyLobbyWorldRules(location.getWorld());
 
         // 反馈给玩家
         player.sendMessage(plugin.getMessage("set_lobby", "&a大厅位置已成功设置为：\n &7世界: %world% \n &7坐标: %coordinates%")

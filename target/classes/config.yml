@@ -68,6 +68,11 @@ game:
   escaper_tracking_enable: true  # 是否启用逃生者队伍跟踪
   hunter_respawn_radius: 300  # 猎人复活配置,复活到逃生者附近的随机半径（格）
   spectator_max_distance: 100 # 旁观者距离观看目标的最大距离（格），超出自动传送回去
+  boat_overheat:
+    enabled: true # 是否启用开船过热机制
+    max_progress: 100.0 # 过热进度上限，达到后强制下船
+    heat_gain_per_second: 0.5 # 玩家在船上时，每秒增加多少过热进度
+    cool_down_per_second: 1.0 # 玩家离船后，每秒降低多少过热进度
   respawn:
     baseRespawnTime: 30  # 最小复活时间(秒)
     maxRespawnTime: 180 # 最大复活时间(秒)
@@ -76,6 +81,9 @@ game:
     final_battle_minutes: 10
     vanilla_hunter_minutes: 25
   vanilla_hunter:
+    cage:
+      release_seconds: 25 # 逃生者开局屏障笼释放时间（秒），兼容旧 hunter_removeCage 配置
+      hunter_extra_release_seconds: 10 # 逃生者放出后，猎人额外等待多久再放出（秒）
     auto_smelt:
       enabled: true # 经典猎人模式挖矿自动熔炼，精准采集工具不会触发
     haste:

@@ -9,6 +9,7 @@ com\huntergame\bedrock\BedrockTrackingGUI$2.class
 com\huntergame\listener\DeathMessageListener.class
 com\huntergame\HunterGame$1.class
 com\huntergame\reward\SettlementRewardService$RewardValues.class
+com\huntergame\listener\BoatOverheatListener$1.class
 com\huntergame\scoreboard\HunterScoreboardManager.class
 com\huntergame\util\SafeLocationFinder$1.class
 com\huntergame\inventory\SharedBackpackManager.class
@@ -68,6 +69,7 @@ com\huntergame\motd\MotdListener.class
 com\huntergame\rank\SeasonManager.class
 com\huntergame\skill\skills\LavaWalkerSkill.class
 com\huntergame\config\PluginConfigFile.class
+com\huntergame\listener\BoatOverheatListener.class
 com\huntergame\skill\skills\TurtleSkill.class
 com\huntergame\skill\skills\WallPhaseSkill.class
 com\huntergame\profession\FinalBattleProfessionManager.class
@@ -129,6 +131,7 @@ com\huntergame\game\GameSettlement$1PlayerStats.class
 com\huntergame\bedrock\BedrockVoteSystemGUI$4.class
 com\huntergame\world\OreMultiplier.class
 com\huntergame\bedrock\BedrockGuideGUI.class
+com\huntergame\listener\LobbyWorldProtectionListener.class
 com\huntergame\skill\skills\SkillContext.class
 com\huntergame\skill\skills\SkillActivationResult.class
 com\huntergame\crafting\PermissionRecipeManager$RecipeEditorHolder.class

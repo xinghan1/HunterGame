@@ -17,6 +17,7 @@ import com.huntergame.game.GameSettlement;
 import com.huntergame.game.StartGame;
 import com.huntergame.inventory.SharedBackpackManager;
 import com.huntergame.listener.ChatActivityListener;
+import com.huntergame.listener.BoatOverheatListener;
 import com.huntergame.listener.CustomEntityListener;
 import com.huntergame.listener.DeathMessageListener;
 import com.huntergame.listener.DragonFightListener;
@@ -24,6 +25,7 @@ import com.huntergame.listener.FinalBattleHunterAdvancementListener;
 import com.huntergame.listener.GameDeathListener;
 import com.huntergame.listener.HunterRespawnListener;
 import com.huntergame.listener.InactivityMonitor;
+import com.huntergame.listener.LobbyWorldProtectionListener;
 import com.huntergame.listener.NoDamageListener;
 import com.huntergame.listener.PlayerConnectionListener;
 import com.huntergame.listener.ServerSelectorListener;
@@ -120,6 +122,11 @@ public class HunterGame extends JavaPlugin implements Listener {
     private boolean settlementStarted = false;
     private boolean pvpLocked = false;
     private int completedHotResets = 0;
+    private static final Set<String> GAME_WORLD_NAMES = new HashSet<>(Arrays.asList(
+            "world",
+            "world_nether",
+            "world_the_end"
+    ));
 
     @Override
     public void onLoad() {
@@ -133,6 +140,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         initializeConfigFiles();
         loadLobbyWorld();
         loadGameWorlds();
+        applyLobbyWorldRules();
 
         Bukkit.getScheduler().runTaskLater(this, this::loadConfig, 20L * 5);
 
@@ -225,6 +233,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         Bukkit.getScheduler().runTaskTimer(this, this::refreshNightVision, 0L, 20L * 10);
         Bukkit.getScheduler().runTaskTimer(this, this::refreshVanillaHunterHaste, 0L, 20L * 10);
         Bukkit.getScheduler().runTaskTimer(this, this::refreshFinalBattleEscaperGlowing, 0L, FINAL_BATTLE_GLOWING_REFRESH_TICKS);
+        Bukkit.getScheduler().runTaskTimer(this, () -> applyLobbyWorldRules(), 20L, 20L * 30);
     }
 
     private void updateScoreboards() {
@@ -347,9 +356,12 @@ public class HunterGame extends JavaPlugin implements Listener {
         registerEvent(new PlayerConnectionListener(this, escaperQuitCountdown, serverSelectorListener));
         registerEvent(serverSelectorListener);
         registerEvent(new WaitingLobbyListener(this));
+        registerEvent(new LobbyWorldProtectionListener(this));
+        registerEvent(new BoatOverheatListener(this));
         registerEvent(new FinalBattleHunterAdvancementListener(this));
         registerEvent(new GameDeathListener(this));
         registerEvent(new DragonFightListener(this));
+        registerEvent(endPortalTracker);
         startGameCommand = new StartGame(this);
         registerEvent(startGameCommand);
         registerEvent(new NoDamageListener(this));
@@ -532,6 +544,7 @@ public class HunterGame extends JavaPlugin implements Listener {
             permissionRecipeManager.reload();
         }
         saveConfig();
+        applyLobbyWorldRules();
         getLogger().info("HunterGame 配置文件已重载!");
     }
 
@@ -549,6 +562,7 @@ public class HunterGame extends JavaPlugin implements Listener {
         } else {
             getLogger().warning("Lobby world not found: " + lobbyWorld);
         }
+        applyLobbyWorldRules();
     }
 
 
@@ -786,6 +800,35 @@ public class HunterGame extends JavaPlugin implements Listener {
     public World getLobbyWorld() {
         String worldName = getConfig().getString("lobby.world", "normal");
         return Bukkit.getWorld(worldName);
+    }
+
+    public boolean isProtectedLobbyWorld(World world) {
+        if (world == null) {
+            return false;
+        }
+
+        String lobbyWorldName = getConfig().getString("lobby.world", "normal");
+        return world.getName().equals(lobbyWorldName) && !GAME_WORLD_NAMES.contains(world.getName());
+    }
+
+    public void applyLobbyWorldRules() {
+        applyLobbyWorldRules(getLobbyWorld());
+    }
+
+    public void applyLobbyWorldRules(World world) {
+        if (!isProtectedLobbyWorld(world)) {
+            return;
+        }
+
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        world.setTime(6000L);
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setWeatherDuration(0);
+        world.setThunderDuration(0);
+        world.setClearWeatherDuration(Integer.MAX_VALUE);
     }
 
     /**

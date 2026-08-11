@@ -11,6 +11,7 @@ D:\plugin\HunterGame\src\main\java\com\huntergame\world\EndWorldProtector.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\listener\ServerSelectorListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\data\DataStorageManager.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\world\OreMultiplier.java
+D:\plugin\HunterGame\src\main\java\com\huntergame\listener\LobbyWorldProtectionListener.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\config\PluginConfigFile.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\game\EscaperQuitCountdown.java
 D:\plugin\HunterGame\src\main\java\com\huntergame\skill\skills\DashSkill.java
