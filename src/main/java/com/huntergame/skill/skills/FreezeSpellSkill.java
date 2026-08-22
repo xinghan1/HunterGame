@@ -73,6 +73,10 @@ public final class FreezeSpellSkill implements HunterSkill {
                 continue;
             }
 
+            if (player.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+                player.removePotionEffect(PotionEffectType.GLOWING);
+                continue;
+            }
             player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, durationTicks, 0, true, false));
             hunter.showPlayer(context.plugin(), player);
             hunter.spawnParticle(

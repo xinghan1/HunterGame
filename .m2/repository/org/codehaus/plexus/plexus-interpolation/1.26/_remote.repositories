@@ -1,4 +1,5 @@
 #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
-#Wed Apr 15 11:36:21 CST 2026
+#Thu Aug 20 21:41:23 HKT 2026
+plexus-interpolation-1.26.jar>central=
 plexus-interpolation-1.26.jar>papermc-repo=
 plexus-interpolation-1.26.pom>papermc-repo=

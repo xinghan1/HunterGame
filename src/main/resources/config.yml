@@ -96,7 +96,7 @@ game:
 ore_multiplier:
   player_radius_chunks: 1      # 玩家跨区块时，处理周围多少圈已加载区块
   max_chunks_per_tick: 1       # 每 tick 最多处理几个区块，调高会更快但更吃性能
-  veins_per_chunk: 18          # 每个区块额外尝试生成的矿脉数，想更夸张可调到 24
+  veins_per_chunk: 24          # 每个区块额外尝试生成的矿脉数，想更夸张可调到 24
   visible_vein_chance: 0.35    # 有多少矿脉优先贴近洞穴表面，方便玩家直接看见
 
 mode-selection:

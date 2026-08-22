@@ -7,9 +7,7 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -19,6 +17,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public class FreezeSkill implements Listener {
+    private static final int MAX_EFFECT_AMPLIFIER = 254;
+
     private final HunterGame plugin;
     private final Map<UUID, FreezeData> frozenPlayers = new HashMap<>();
     private final Map<UUID, Integer> freezeTasks = new HashMap<>();
@@ -54,7 +54,16 @@ public class FreezeSkill implements Listener {
                     && (!checkRadius || hunterLoc.distanceSquared(target.getLocation()) <= radiusSquared)
                     && !target.hasPotionEffect(PotionEffectType.INVISIBILITY)
                     && target.getGameMode() != GameMode.SPECTATOR) {
-                Location originalLoc = target.getLocation().clone();
+                FreezeData previousFreeze = frozenPlayers.get(targetId);
+                Map<PotionEffectType, PotionEffect> previousEffects = previousFreeze == null
+                        ? capturePreviousEffects(target)
+                        : previousFreeze.getPreviousEffects();
+
+                Integer previousTaskId = freezeTasks.remove(targetId);
+                if (previousTaskId != null) {
+                    Bukkit.getScheduler().cancelTask(previousTaskId);
+                }
+
                 target.setMetadata("frozen_by_perspective", new FixedMetadataValue(plugin, hunterId));
                 target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_STARE, 1.0F, 1.5F);
                 target.getWorld().spawnParticle(
@@ -66,18 +75,35 @@ public class FreezeSkill implements Listener {
                         0.5,
                         0.2
                 );
-                target.addPotionEffect(new PotionEffect(
-                        PotionEffectType.RESISTANCE,
-                        durationTicks,
-                        resistanceAmplifier,
-                        true,
-                        false
-                ));
+                applyFreezeEffect(target, PotionEffectType.SLOWNESS, durationTicks, MAX_EFFECT_AMPLIFIER);
+                applyFreezeEffect(target, PotionEffectType.BLINDNESS, durationTicks, 0);
+                applyFreezeEffect(target, PotionEffectType.WEAKNESS, durationTicks, MAX_EFFECT_AMPLIFIER);
+                applyFreezeEffect(target, PotionEffectType.RESISTANCE, durationTicks, resistanceAmplifier);
 
-                frozenPlayers.put(targetId, new FreezeData(hunterId, durationTicks, originalLoc));
+                frozenPlayers.put(targetId, new FreezeData(previousEffects));
                 int taskId = Bukkit.getScheduler().runTaskLater(plugin, () -> unfreezePlayer(targetId), durationTicks).getTaskId();
                 freezeTasks.put(targetId, taskId);
             }
+        }
+    }
+
+    private void applyFreezeEffect(Player player, PotionEffectType type, int durationTicks, int amplifier) {
+        player.addPotionEffect(new PotionEffect(type, durationTicks, amplifier, true, false), true);
+    }
+
+    private Map<PotionEffectType, PotionEffect> capturePreviousEffects(Player player) {
+        Map<PotionEffectType, PotionEffect> previousEffects = new HashMap<>();
+        rememberEffect(player, PotionEffectType.SLOWNESS, previousEffects);
+        rememberEffect(player, PotionEffectType.BLINDNESS, previousEffects);
+        rememberEffect(player, PotionEffectType.WEAKNESS, previousEffects);
+        rememberEffect(player, PotionEffectType.RESISTANCE, previousEffects);
+        return previousEffects;
+    }
+
+    private void rememberEffect(Player player, PotionEffectType type, Map<PotionEffectType, PotionEffect> effects) {
+        PotionEffect effect = player.getPotionEffect(type);
+        if (effect != null) {
+            effects.put(type, effect);
         }
     }
 
@@ -86,9 +112,14 @@ public class FreezeSkill implements Listener {
             return;
         }
 
+        FreezeData freezeData = frozenPlayers.remove(playerId);
         Player player = Bukkit.getPlayer(playerId);
         if (player != null) {
             player.removeMetadata("frozen_by_perspective", plugin);
+            removeFreezeEffect(player, PotionEffectType.SLOWNESS, freezeData);
+            removeFreezeEffect(player, PotionEffectType.BLINDNESS, freezeData);
+            removeFreezeEffect(player, PotionEffectType.WEAKNESS, freezeData);
+            removeFreezeEffect(player, PotionEffectType.RESISTANCE, freezeData);
             player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
         }
 
@@ -96,28 +127,13 @@ public class FreezeSkill implements Listener {
         if (taskId != null) {
             Bukkit.getScheduler().cancelTask(taskId);
         }
-        frozenPlayers.remove(playerId);
     }
 
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
-
-        if (!isPlayerFrozen(playerId)) {
-            return;
-        }
-
-        FreezeData freezeData = frozenPlayers.get(playerId);
-        if (freezeData == null) {
-            return;
-        }
-
-        Location originalLoc = freezeData.getOriginalLocation();
-        if (isPositionChanged(event.getTo(), originalLoc)) {
-            event.setCancelled(true);
-            player.teleport(originalLoc);
-            player.setRotation(originalLoc.getYaw(), originalLoc.getPitch());
+    private void removeFreezeEffect(Player player, PotionEffectType type, FreezeData freezeData) {
+        player.removePotionEffect(type);
+        PotionEffect previousEffect = freezeData.getPreviousEffects().get(type);
+        if (previousEffect != null) {
+            player.addPotionEffect(previousEffect, true);
         }
     }
 
@@ -128,40 +144,15 @@ public class FreezeSkill implements Listener {
                 && player.hasMetadata("frozen_by_perspective");
     }
 
-    private boolean isPositionChanged(Location newLoc, Location originalLoc) {
-        if (newLoc == null) {
-            return true;
-        }
-
-        double tolerance = 0.01;
-        return Math.abs(newLoc.getX() - originalLoc.getX()) > tolerance
-                || Math.abs(newLoc.getY() - originalLoc.getY()) > tolerance
-                || Math.abs(newLoc.getZ() - originalLoc.getZ()) > tolerance
-                || Math.abs(newLoc.getYaw() - originalLoc.getYaw()) > 1
-                || Math.abs(newLoc.getPitch() - originalLoc.getPitch()) > 1;
-    }
-
     private static class FreezeData {
-        private final UUID hunterId;
-        private final int durationTicks;
-        private final Location originalLocation;
+        private final Map<PotionEffectType, PotionEffect> previousEffects;
 
-        FreezeData(UUID hunterId, int durationTicks, Location originalLocation) {
-            this.hunterId = hunterId;
-            this.durationTicks = durationTicks;
-            this.originalLocation = originalLocation;
+        FreezeData(Map<PotionEffectType, PotionEffect> previousEffects) {
+            this.previousEffects = previousEffects;
         }
 
-        public UUID getHunterId() {
-            return hunterId;
-        }
-
-        public int getDurationTicks() {
-            return durationTicks;
-        }
-
-        public Location getOriginalLocation() {
-            return originalLocation;
+        public Map<PotionEffectType, PotionEffect> getPreviousEffects() {
+            return previousEffects;
         }
     }
 }

@@ -9,11 +9,13 @@ import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -25,6 +27,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class FinalBattleManager implements Listener {
+    private static final double VANILLA_ENDER_DRAGON_HEALTH = 200.0;
+
     private final HunterGame plugin;
     private final Map<UUID, Integer> playerVotes;
 
@@ -32,7 +36,6 @@ public class FinalBattleManager implements Listener {
     private final List<Player> hunters = new ArrayList<>();
 
     private boolean gameActive = false;
-    private boolean dragonHealthModified = false;
     private final Map<UUID, Set<Location>> playerCages = new HashMap<>();
     private final Map<UUID, Integer> taskIds = new HashMap<>();
     private final Set<Location> barrierBlocks = new HashSet<>();
@@ -68,8 +71,7 @@ public class FinalBattleManager implements Listener {
         teleportPlayers(endWorld);
         openProfessionSelection();
         createCagesForAllPlayers();
-        // 检查是否已有末影龙
-        checkAndModifyExistingDragon(endWorld);
+        restoreExistingDragonHealth(endWorld);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Bukkit.broadcastMessage(plugin.getMessage("final_battle_started", "&a===== 终章之战 已启动 ====="));
@@ -104,43 +106,16 @@ public class FinalBattleManager implements Listener {
         }
     }
 
-    /**
-     * 检查并修改现有末影龙的生命值
-     */
-    private void checkAndModifyExistingDragon(World world) {
-        // 遍历世界中的所有实体，查找末影龙
+    private void restoreExistingDragonHealth(World world) {
         for (Entity entity : world.getEntities()) {
-            if (entity instanceof EnderDragon) {
-                modifyDragonHealth((EnderDragon) entity);
+            if (entity instanceof EnderDragon dragon) {
+                AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+                if (maxHealthAttribute != null) {
+                    maxHealthAttribute.setBaseValue(VANILLA_ENDER_DRAGON_HEALTH);
+                    dragon.setHealth(VANILLA_ENDER_DRAGON_HEALTH);
+                }
                 break;
             }
-        }
-    }
-
-    /**
-     * 修改末影龙的生命值
-     */
-    private void modifyDragonHealth(EnderDragon dragon) {
-        // 设置最大生命值）
-        AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
-        if (maxHealthAttribute != null) {
-            maxHealthAttribute.setBaseValue(400.0); // 设置最大生命值为400
-            dragon.setHealth(400.0); // 设置当前生命值为400
-            dragonHealthModified = true;
-            dragon.getWorld().strikeLightningEffect(dragon.getLocation());
-            Bukkit.broadcastMessage(plugin.getMessage("dragon_awakened", "&c末影龙已觉醒！生命值: %health%")
-                    .replace("%health%", "400"));
-        }
-    }
-
-    /**
-     * 监听末影龙生成事件
-     */
-    @EventHandler
-    public void onDragonSpawn(CreatureSpawnEvent event) {
-        if (event.getEntity() instanceof EnderDragon && !dragonHealthModified) {
-            EnderDragon dragon = (EnderDragon) event.getEntity();
-            modifyDragonHealth(dragon);
         }
     }
 
@@ -158,29 +133,37 @@ public class FinalBattleManager implements Listener {
     public void createCage(Player player) {
         UUID playerId = player.getUniqueId();
         Location center = player.getLocation().clone();
-        center = center.getBlock().getLocation().add(0, 1, 0); // 调整中心高度
+        center = center.getBlock().getLocation().add(0.5, 2, 0.5); // 整体上抬，避免加厚底板替换下方地形
 
         Set<Location> cageBlocks = new HashSet<>();
-        int radius = 2; // 5x5x5立方体
+        int innerRadius = 1;
+        int barrierThickness = 2;
+        int outerRadius = innerRadius + barrierThickness;
+        int innerMinY = 0;
+        int innerMaxY = 2;
+        int outerMinY = innerMinY - barrierThickness;
+        int outerMaxY = innerMaxY + barrierThickness;
 
-        // 生成5x5x5空心立方体
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -1; y <= 3; y++) { // 高度从脚下-1到头顶+3
-                for (int z = -radius; z <= radius; z++) {
-                    boolean isSurface =
-                            Math.abs(x) == radius ||
-                                    Math.abs(z) == radius ||
-                                    y == -1 || y == 3;
+        player.teleport(center.clone().add(0, innerMinY, 0));
+
+        // 内部空间保持不变，外壳加厚到2格屏障
+        for (int x = -outerRadius; x <= outerRadius; x++) {
+            for (int y = outerMinY; y <= outerMaxY; y++) {
+                for (int z = -outerRadius; z <= outerRadius; z++) {
+                    boolean isInnerAir =
+                            Math.abs(x) <= innerRadius &&
+                                    Math.abs(z) <= innerRadius &&
+                                    y >= innerMinY && y <= innerMaxY;
 
                     Location loc = center.clone().add(x, y, z);
                     Block block = loc.getBlock();
 
-                    if (isSurface) {
+                    if (isInnerAir) {
+                        block.setType(Material.AIR);
+                    } else {
                         block.setType(Material.BARRIER);
                         cageBlocks.add(loc);
                         barrierBlocks.add(loc);
-                    } else {
-                        block.setType(Material.AIR);
                     }
                 }
             }
@@ -274,6 +257,39 @@ public class FinalBattleManager implements Listener {
             }
             playerCages.remove(playerId);
         }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEnderPearlUse(PlayerInteractEvent event) {
+        if (!isPearlLockedPlayer(event.getPlayer())) {
+            return;
+        }
+
+        ItemStack item = event.getItem();
+        if (item == null || item.getType() != Material.ENDER_PEARL) {
+            return;
+        }
+
+        event.setCancelled(true);
+        event.getPlayer().sendMessage(plugin.getMessage("final_battle_pearl_locked", "&c开局保护期间不能使用末影珍珠！"));
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEnderPearlLaunch(ProjectileLaunchEvent event) {
+        if (!(event.getEntity() instanceof EnderPearl pearl) || !(pearl.getShooter() instanceof Player player)) {
+            return;
+        }
+
+        if (!isPearlLockedPlayer(player)) {
+            return;
+        }
+
+        event.setCancelled(true);
+        player.sendMessage(plugin.getMessage("final_battle_pearl_locked", "&c开局保护期间不能使用末影珍珠！"));
+    }
+
+    private boolean isPearlLockedPlayer(Player player) {
+        return gameActive && player != null && playerCages.containsKey(player.getUniqueId());
     }
 
     private void assignRoles() {

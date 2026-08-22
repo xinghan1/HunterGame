@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Aug 20 21:40:37 HKT 2026
+mysql-connector-j-8.4.0.jar>papermc-repo=
+mysql-connector-j-8.4.0.pom>papermc-repo=

@@ -1033,6 +1033,45 @@ public class FinalBattleProfessionManager implements Listener {
                 plugin.saveResource(resource, false);
             }
         }
+        migrateLegacyMaceSkills();
+    }
+
+    private void migrateLegacyMaceSkills() {
+        migrateLegacyMaceSkill(new File(jobsFolder, "hunter_mace.yml"));
+        migrateLegacyMaceSkill(new File(jobsFolder, "escaper_mace.yml"));
+    }
+
+    private void migrateLegacyMaceSkill(File jobFile) {
+        if (!jobFile.isFile()) {
+            return;
+        }
+
+        FileConfiguration config = YamlConfiguration.loadConfiguration(jobFile);
+        if (!"闪现".equals(config.getString("skill", ""))) {
+            return;
+        }
+
+        config.set("skill", "腾空");
+        List<String> lore = config.getStringList("lore");
+        for (int i = 0; i < lore.size(); i++) {
+            String line = lore.get(i);
+            if (line.contains("向正前方闪现30格")) {
+                lore.set(
+                        i,
+                        "&7蹲下+手持重锤+右键，向上腾空约12格，冷却12秒"
+                );
+            }
+        }
+        config.set("lore", lore);
+
+        try {
+            config.save(jobFile);
+        } catch (IOException ex) {
+            plugin.getLogger().warning(
+                    "迁移重锤职业腾空技能失败: " + jobFile.getName()
+                            + " - " + ex.getMessage()
+            );
+        }
     }
 
     private boolean hasJobFiles() {

@@ -53,6 +53,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -288,9 +289,37 @@ public class HunterGame extends JavaPlugin implements Listener {
         );
 
         for (Player escaper : getEscapers()) {
-            if (escaper != null && escaper.isOnline() && escaper.getGameMode() != GameMode.SPECTATOR) {
-                escaper.addPotionEffect(glowing, true);
+            if (escaper == null || !escaper.isOnline() || escaper.getGameMode() == GameMode.SPECTATOR) {
+                continue;
             }
+            if (escaper.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+                escaper.removePotionEffect(PotionEffectType.GLOWING);
+                continue;
+            }
+            escaper.addPotionEffect(glowing, true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEscaperPotionEffect(EntityPotionEffectEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+                || !isEscaper(player.getUniqueId())) {
+            return;
+        }
+
+        PotionEffect newEffect = event.getNewEffect();
+        if (newEffect == null) {
+            return;
+        }
+
+        if (newEffect.getType().equals(PotionEffectType.INVISIBILITY)) {
+            player.removePotionEffect(PotionEffectType.GLOWING);
+            return;
+        }
+
+        if (newEffect.getType().equals(PotionEffectType.GLOWING)
+                && player.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+            event.setCancelled(true);
         }
     }
 
@@ -809,6 +838,15 @@ public class HunterGame extends JavaPlugin implements Listener {
 
         String lobbyWorldName = getConfig().getString("lobby.world", "normal");
         return world.getName().equals(lobbyWorldName) && !GAME_WORLD_NAMES.contains(world.getName());
+    }
+
+    public boolean isWaitingLobbyWorld(World world) {
+        if (world == null || isGameRunning()) {
+            return false;
+        }
+
+        String lobbyWorldName = getConfig().getString("lobby.world", "normal");
+        return world.getName().equals(lobbyWorldName);
     }
 
     public void applyLobbyWorldRules() {

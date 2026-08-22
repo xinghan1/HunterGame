@@ -59,6 +59,7 @@ public class SkillManager implements Listener {
         SKILL_COOLDOWNS.put("熔岩行者", 30);
         SKILL_COOLDOWNS.put("闪现", 120);
         SKILL_COOLDOWNS.put("定身术", 125);
+        SKILL_COOLDOWNS.put("腾空", 12);
 
         SKILL_DURATIONS.put("隐身", 30);
         SKILL_DURATIONS.put("盾构机", 30);
@@ -106,6 +107,7 @@ public class SkillManager implements Listener {
         registerSkill(new LavaWalkerSkill());
         registerSkill(new BlinkSkill());
         registerSkill(new FreezeSpellSkill());
+        registerSkill(new AirLaunchSkill());
     }
 
     private void registerSkill(HunterSkill skill) {
@@ -325,6 +327,9 @@ public class SkillManager implements Listener {
 
         Player player = event.getPlayer();
         String skillName = getSelectedSkill(player);
+        if (!"突进".equals(skillName) && !player.isSneaking()) {
+            return;
+        }
         HunterSkill skill = getEnabledSkill(skillName);
         if (skill == null || !skill.canActivateByRightClick()) {
             return;
@@ -616,19 +621,28 @@ public class SkillManager implements Listener {
     private String getBossBarText(String skillName, String state, int secondsLeft) {
         String fallback;
         if ("duration".equals(state)) {
-            fallback = "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键";
+            fallback = "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键";
         } else if ("cooldown".equals(state)) {
-            fallback = "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键";
+            fallback = "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键";
         } else {
-            fallback = "&a技能: %skill% (就绪) 触发方式: 手持工具+右键";
+            fallback = "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键";
         }
 
         ConfigurationSection section = getSkillSection(skillName);
         String text = section == null ? fallback : section.getString("bossbar." + state, fallback);
+        String trigger = "突进".equals(skillName)
+                ? "手持长矛+右键"
+                : "蹲下+手持工具+右键";
+        if ("突进".equals(skillName)) {
+            text = text.replace("蹲下+手持长矛+右键", trigger)
+                    .replace("蹲下+手持工具+右键", trigger);
+        } else if (text.contains("右键")) {
+            text = text.replace("触发方式: 手持", "触发方式: 蹲下+手持");
+        }
         return ChatColor.translateAlternateColorCodes('&', text)
                 .replace("%skill%", skillName == null ? "" : skillName)
                 .replace("%seconds%", String.valueOf(Math.max(0, secondsLeft)))
-                .replace("%trigger%", "手持工具+右键");
+                .replace("%trigger%", trigger);
     }
 
     private double clampProgress(double progress) {

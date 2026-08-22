@@ -2,6 +2,7 @@ package com.huntergame.game;
 
 import com.huntergame.HunterGame;
 import com.huntergame.role.RoleSelectionHandler;
+import com.huntergame.util.PlayerInventoryCleaner;
 import com.huntergame.util.SafeLocationFinder;
 import com.huntergame.vote.VoteSystem;
 import org.bukkit.*;
@@ -384,6 +385,12 @@ public class StartGame implements Listener {
             return;
         }
 
+        // 基岩版可把等待阶段获得的物品留在个人合成栏中，普通的 PlayerInventory#clear() 不会清掉这些槽位。
+        // 必须在任何模式发放开局物品前统一清理，同时关闭客户端仍打开的合成界面。
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            PlayerInventoryCleaner.clearAll(player);
+        }
+
         plugin.getGameSettlement().resetStats();
 
         // 获取投票结果并确定模式
@@ -421,7 +428,7 @@ public class StartGame implements Listener {
         for (Player hunter : assignedHunters) {
             plugin.addHunter(hunter.getUniqueId());
             giveHunterMark(hunter);
-            hunter.getInventory().clear();
+            PlayerInventoryCleaner.clearAll(hunter);
 
             // 属性设置
             hunter.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(hunterHealth);
@@ -443,7 +450,7 @@ public class StartGame implements Listener {
         for (Player escaper : assignedEscapers) {
             plugin.addEscaper(escaper.getUniqueId());
             giveEscaperMark(escaper);
-            escaper.getInventory().clear();
+            PlayerInventoryCleaner.clearAll(escaper);
 
             // 属性设置
             escaper.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(escaperHealth);

@@ -97,6 +97,7 @@ com\huntergame\tracking\HunterTracker.class
 com\huntergame\reward\GameRewardService.class
 com\huntergame\world\EndermanLimiter.class
 com\huntergame\rank\RankManager.class
+com\huntergame\skill\skills\AirLaunchSkill.class
 com\huntergame\gui\SpectatorGUI.class
 com\huntergame\util\FloodgateSupport.class
 com\huntergame\skill\skills\BlinkSkill$1.class
@@ -138,5 +139,6 @@ com\huntergame\crafting\PermissionRecipeManager$RecipeEditorHolder.class
 com\huntergame\listener\NoDamageListener.class
 com\huntergame\rank\Rank.class
 com\huntergame\placeholder\HunterGamePlaceholder$1.class
+com\huntergame\util\PlayerInventoryCleaner.class
 com\huntergame\skill\skills\DoubleJumpSkill$2.class
 com\huntergame\skill\skills\InvisibilitySkill.class

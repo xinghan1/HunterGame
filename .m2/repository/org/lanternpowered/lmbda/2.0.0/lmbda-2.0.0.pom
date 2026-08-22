@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.lanternpowered</groupId>
+  <artifactId>lmbda</artifactId>
+  <version>2.0.0</version>
+  <name>Lmbda</name>
+  <description>A lambda generation library</description>
+  <url>https://github.com/LanternPowered/Lmbda</url>
+  <inceptionYear>2018</inceptionYear>
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>Cybermaxke</id>
+      <name>Seppe Volkaerts</name>
+      <email>contact@seppevolkaerts.be</email>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git@github.com:LanternPowered/Lmbda.git</connection>
+    <developerConnection>scm:git@github.com:LanternPowered/Lmbda.git</developerConnection>
+    <url>https://github.com/LanternPowered/Lmbda</url>
+  </scm>
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/LanternPowered/Lmbda/issues</url>
+  </issueManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+      <version>7.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <version>2.8.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>26.0-jre</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>5.2.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

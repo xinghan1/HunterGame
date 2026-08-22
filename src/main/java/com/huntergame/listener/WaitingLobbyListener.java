@@ -2,9 +2,13 @@ package com.huntergame.listener;
 
 import com.huntergame.HunterGame;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 
@@ -13,6 +17,15 @@ public class WaitingLobbyListener implements Listener {
 
     public WaitingLobbyListener(HunterGame plugin) {
         this.plugin = plugin;
+        // 处理插件启用前或区块重新加载时已经存在的生物实体。
+        plugin.getServer().getScheduler().runTaskTimer(plugin, this::removeWaitingLivingEntities, 1L, 20L);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onWaitingCreatureSpawn(CreatureSpawnEvent event) {
+        if (plugin.isWaitingLobbyWorld(event.getLocation().getWorld())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
@@ -54,5 +67,18 @@ public class WaitingLobbyListener implements Listener {
 
         player.setFallDistance(0);
         player.teleport(lobbyLocation);
+    }
+
+    private void removeWaitingLivingEntities() {
+        World lobbyWorld = plugin.getLobbyWorld();
+        if (!plugin.isWaitingLobbyWorld(lobbyWorld)) {
+            return;
+        }
+
+        for (LivingEntity entity : lobbyWorld.getLivingEntities()) {
+            if (!(entity instanceof Player) && !(entity instanceof ArmorStand)) {
+                entity.remove();
+            }
+        }
     }
 }

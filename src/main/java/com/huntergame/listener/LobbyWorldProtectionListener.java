@@ -195,6 +195,6 @@ public class LobbyWorldProtectionListener implements Listener {
     }
 
     private boolean isLobbyWorld(World world) {
-        return plugin.isProtectedLobbyWorld(world);
+        return plugin.isProtectedLobbyWorld(world) || plugin.isWaitingLobbyWorld(world);
     }
 }

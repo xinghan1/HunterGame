@@ -43,13 +43,13 @@ skills:
       upward_strength: 0.3 # 向上击飞力度
       max_spear_damage: 30.0 # 长矛单次伤害上限
 
-  # 手持工具/武器右键，在面前生成即将爆炸的 TNT。
+  # 蹲下手持工具/武器右键，在面前生成即将爆炸的 TNT。
   爆破专家:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 40
     duration: 0
     parameters:
@@ -61,38 +61,38 @@ skills:
       forward_offset: 1.2             # TNT 生成点相对玩家视线向前偏移距离
       y_offset: 0.8                   # TNT 生成点相对玩家脚底向上偏移距离
 
-  # 手持工具/武器右键，隐身并隐藏装备。
+  # 蹲下手持工具/武器右键，隐身并隐藏装备。
   隐身:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 120
     duration: 20                      # 隐身持续时间
     parameters:
       speed_amplifier: 1              # 隐身期间速度药水等级，0=速度 II
       resistance_amplifier: 3         # 隐身期间抗性等级，1=抗性 III
 
-  # 手持工具/武器右键，短时间获得高等级急迫。
+  # 蹲下手持工具/武器右键，短时间获得高等级急迫。
   盾构机:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 120
     duration: 30                      # 急迫持续时间
     parameters:
       haste_amplifier: 254            # 急迫等级，数值很高时接近瞬间挖掘
 
-  # 手持工具/武器右键，获得抗性并附带减速。
+  # 蹲下手持工具/武器右键，获得抗性并附带减速。
   神龟:
     enabled: true
     bossbar:
       ready: "&a技能: %skill% (就绪) 触发方式: %trigger%"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 120
     duration: 20                      # 抗性和减速持续时间
     parameters:
@@ -112,24 +112,24 @@ skills:
       rockets_per_supply: 10           # 每次补充的爆炸火箭数量
       true_damage: 3.0                 # 爆炸命中半径内造成的固定真实伤害，1点=半颗心
 
-  # 手持工具/武器右键，临时进入旁观模式穿墙。
+  # 蹲下手持工具/武器右键，临时进入旁观模式穿墙。
   穿墙:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 90
     duration: 5                       # 穿墙持续时间，到时自动回到生存模式
     parameters: {}
 
-  # 手持工具/武器右键，击退附近生存模式玩家。
+  # 蹲下手持工具/武器右键，击退附近生存模式玩家。
   击退领域:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 60
     duration: 0
     parameters:
@@ -137,13 +137,13 @@ skills:
       horizontal_strength: 9.0        # 水平击退力度
       vertical_strength: 1.5          # 向上击退力度
 
-  # 手持工具/武器右键，获得高速移动，结束后短暂减速。
+  # 蹲下手持工具/武器右键，获得高速移动，结束后短暂减速。
   肾上腺爆发:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 120
     duration: 20                      # 猎人基础加速持续时间
     parameters:
@@ -152,13 +152,13 @@ skills:
       slowness_after_seconds: 3       # 加速结束后的减速持续秒数
       slowness_after_amplifier: 1     # 加速结束后的减速等级，1=缓慢 II
 
-  # 手持工具/武器右键，面前生成岩浆并获得抗火；攻击时概率点燃目标。
+  # 蹲下手持工具/武器右键，面前生成岩浆并获得抗火；攻击时概率点燃目标。
   熔岩行者:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 40
     duration: 0
     parameters:
@@ -169,13 +169,13 @@ skills:
       fire_chance: 0.20               # 攻击时点燃目标概率，0.20=20%
       fire_ticks: 60                  # 点燃目标持续 tick，60=3 秒
 
-  # 手持工具/武器右键，朝视线方向传送一段距离。
+  # 蹲下手持工具/武器右键，朝视线方向传送一段距离。
   闪现:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 120
     duration: 0
     parameters:
@@ -186,13 +186,13 @@ skills:
       speed_ticks: 200                # 闪现后速度持续 tick，200=10 秒
       speed_amplifier: 1              # 闪现后速度等级，1=速度 II
 
-  # 手持工具/武器右键，定身所有在线逃生者并让逃生者发光。
+  # 蹲下手持工具/武器右键，定身所有在线逃生者并让逃生者发光。
   定身术:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 手持工具+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持工具+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持工具+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持工具+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持工具+右键"
     cooldown: 90
     parameters:
       freeze_ticks: 100                # 实际定身持续 tick，60=3 秒
@@ -200,3 +200,15 @@ skills:
       haste_ticks: 2147483647         # 猎人获得急迫持续 tick，默认接近永久
       haste_amplifier: 2              # 急迫等级，2=急迫 III
       frozen_resistance_amplifier: 4 # 被定身者获得的抗性等级，防止定身期间被秒杀
+
+  # 蹲下手持重锤右键，向上腾空约 12 格。
+  腾空:
+    enabled: true
+    bossbar:
+      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持重锤+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持重锤+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持重锤+右键"
+    cooldown: 12
+    duration: 0
+    parameters:
+      vertical_velocity: 1.45         # 垂直初速度，约可升空 12 格

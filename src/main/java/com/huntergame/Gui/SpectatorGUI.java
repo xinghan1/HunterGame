@@ -4,6 +4,7 @@ import com.huntergame.HunterGame;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -12,14 +13,19 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.UUID;
 
 public class SpectatorGUI implements Listener {
 
     private final HunterGame plugin;
+    private final NamespacedKey spectatorTargetKey;
 
     public SpectatorGUI(HunterGame plugin) {
         this.plugin = plugin;
+        this.spectatorTargetKey = new NamespacedKey(plugin, "spectator_target");
     }
 
     /**
@@ -52,11 +58,15 @@ public class SpectatorGUI implements Listener {
             if (slot > 35) break; // 背包满了就不加了
 
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            SkullMeta meta = (SkullMeta) head.getItemMeta();
+            ItemMeta meta = head.getItemMeta();
             if (meta != null) {
-                meta.setOwningPlayer(p);
                 meta.setDisplayName(plugin.getMessage("spectator_head_display_name", "&e点击观看：&a%player%")
                         .replace("%player%", p.getName()));
+                meta.getPersistentDataContainer().set(
+                        spectatorTargetKey,
+                        PersistentDataType.STRING,
+                        p.getUniqueId().toString()
+                );
                 head.setItemMeta(meta);
             }
 
@@ -163,10 +173,18 @@ public class SpectatorGUI implements Listener {
 
         event.setCancelled(true); // 禁止拿走头像
 
-        SkullMeta meta = (SkullMeta) item.getItemMeta();
-        if (meta == null || meta.getOwningPlayer() == null) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
 
-        Player target = meta.getOwningPlayer().getPlayer();
+        String targetId = meta.getPersistentDataContainer().get(spectatorTargetKey, PersistentDataType.STRING);
+        if (targetId == null) return;
+
+        Player target;
+        try {
+            target = Bukkit.getPlayer(UUID.fromString(targetId));
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
         if (target == null || !target.isOnline()) {
             spectator.sendMessage(plugin.getMessage("spectator_target_offline", "&c玩家已离线！"));
             return;

@@ -1,4 +1,6 @@
 #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
-#Wed Apr 15 11:36:21 CST 2026
+#Thu Aug 20 21:41:14 HKT 2026
+maven-resolver-util-1.9.18.jar>central=
 maven-resolver-util-1.9.18.jar>papermc-repo=
+maven-resolver-util-1.9.18.pom>central=
 maven-resolver-util-1.9.18.pom>papermc-repo=
