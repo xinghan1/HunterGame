@@ -33,7 +33,7 @@ public final class AirLaunchSkill implements HunterSkill {
         player.playSound(player.getLocation(), Sound.ENTITY_BREEZE_JUMP, 1.0F, 1.1F);
         player.sendTitle(
                 context.message("skill_air_launch_title", "&b↑ &l腾空 &r↑"),
-                context.message("skill_air_launch_subtitle", "&7升空约 12 格"),
+                "",
                 5, 30, 10
         );
         context.sendActivationMessage(player);

@@ -112,6 +112,10 @@ public class DataStorageManager {
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='HunterGame 玩家统计';";
 
         return databaseClient.execute(createTableSql, Collections.emptyList())
+                .thenCompose(ignored -> databaseClient.execute(
+                        "UPDATE " + tableName + " SET proficiency = GREATEST(0, COALESCE(proficiency, 0)) " +
+                                "WHERE proficiency < 0 OR proficiency IS NULL",
+                        Collections.emptyList()))
                 .thenCompose(ignored -> databaseClient.query("SELECT * FROM " + tableName, Collections.emptyList()))
                 .thenAccept(rows -> {
                     for (Map<String, Object> row : rows) {
@@ -141,12 +145,27 @@ public class DataStorageManager {
         }
 
         YamlConfiguration config = YamlConfiguration.loadConfiguration(dataFile);
+        int repairedProficiencyCount = 0;
         for (String key : config.getKeys(false)) {
             try {
                 UUID uuid = UUID.fromString(key);
-                statsCache.put(uuid, PlayerStats.fromConfig(config, key));
+                PlayerStats stats = PlayerStats.fromConfig(config, key);
+                statsCache.put(uuid, stats);
+                double storedProficiency = config.getDouble(key + ".proficiency");
+                if (Double.compare(storedProficiency, stats.proficiency) != 0) {
+                    config.set(key + ".proficiency", stats.proficiency);
+                    repairedProficiencyCount++;
+                }
             } catch (IllegalArgumentException ignored) {
                 // Ignore non-player top-level keys left by older configurations.
+            }
+        }
+        if (repairedProficiencyCount > 0) {
+            try {
+                config.save(dataFile);
+                plugin.getLogger().info("已将 " + repairedProficiencyCount + " 条负熟练度数据修正为 0。");
+            } catch (IOException error) {
+                plugin.getLogger().warning("修正本地负熟练度数据失败: " + error.getMessage());
             }
         }
     }
@@ -328,8 +347,14 @@ public class DataStorageManager {
     }
 
     public void addProficiency(Player player, double count) {
+        if (!Double.isFinite(count)) {
+            plugin.getLogger().warning("忽略玩家 " + player.getName() + " 的非法熟练度变动: " + count);
+            return;
+        }
         UUID playerId = player.getUniqueId();
-        increment(playerId, player.getName(), stats -> stats.proficiency += count, "proficiency", count);
+        increment(playerId, player.getName(),
+                stats -> stats.proficiency = normalizeProficiency(stats.proficiency + count),
+                "proficiency", count);
     }
 
     public double getProficiency(Player player) {
@@ -337,7 +362,8 @@ public class DataStorageManager {
     }
 
     public double getProficiency(UUID playerId) {
-        return new BigDecimal(stats(playerId).proficiency).setScale(2, RoundingMode.HALF_UP).doubleValue();
+        return new BigDecimal(normalizeProficiency(stats(playerId).proficiency))
+                .setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
     public void addRank(UUID playerId, Player player) {
@@ -430,17 +456,25 @@ public class DataStorageManager {
         StringBuilder placeholders = new StringBuilder("?, ?");
         StringBuilder updates = new StringBuilder("name = VALUES(name)");
         List<Object> params = new ArrayList<>();
+        List<Object> updateParams = new ArrayList<>();
         params.add(uuid.toString());
         params.add(playerName == null ? "" : playerName);
 
         for (Map.Entry<String, Number> entry : deltas.entrySet()) {
             String field = entry.getKey();
             columns.append(", `").append(field).append('`');
-            placeholders.append(", ?");
-            updates.append(", `").append(field).append("` = `").append(field)
-                    .append("` + VALUES(`").append(field).append("`)");
+            if ("proficiency".equals(field)) {
+                placeholders.append(", GREATEST(0, ?)");
+                updates.append(", `proficiency` = GREATEST(0, `proficiency` + ?)");
+                updateParams.add(entry.getValue());
+            } else {
+                placeholders.append(", ?");
+                updates.append(", `").append(field).append("` = `").append(field)
+                        .append("` + VALUES(`").append(field).append("`)");
+            }
             params.add(entry.getValue());
         }
+        params.addAll(updateParams);
 
         String sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + placeholders + ") " +
                 "ON DUPLICATE KEY UPDATE " + updates;
@@ -544,6 +578,13 @@ public class DataStorageManager {
         return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
+    private static double normalizeProficiency(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+        return Math.max(0.0, value);
+    }
+
     private static <T> CompletableFuture<T> failedFuture(Throwable error) {
         CompletableFuture<T> future = new CompletableFuture<>();
         future.completeExceptionally(error);
@@ -579,7 +620,7 @@ public class DataStorageManager {
             stats.hunterWins = number(row.get("hunter_wins")).intValue();
             stats.escapeWins = number(row.get("escape_wins")).intValue();
             stats.totalWins = number(row.get("total_wins")).intValue();
-            stats.proficiency = number(row.get("proficiency")).doubleValue();
+            stats.proficiency = normalizeProficiency(number(row.get("proficiency")).doubleValue());
             stats.rank = valueOrEmpty(row.get("rank"));
             return stats;
         }
@@ -593,7 +634,7 @@ public class DataStorageManager {
             stats.hunterWins = config.getInt(key + ".hunter_wins");
             stats.escapeWins = config.getInt(key + ".escape_wins");
             stats.totalWins = config.getInt(key + ".total_wins", stats.hunterWins + stats.escapeWins);
-            stats.proficiency = config.getDouble(key + ".proficiency");
+            stats.proficiency = normalizeProficiency(config.getDouble(key + ".proficiency"));
             stats.rank = config.getString(key + ".rank", "");
             return stats;
         }
@@ -606,7 +647,7 @@ public class DataStorageManager {
                 case "hunter_wins": return hunterWins;
                 case "escape_wins": return escapeWins;
                 case "total_wins": return totalWins;
-                case "proficiency": return proficiency;
+                case "proficiency": return normalizeProficiency(proficiency);
                 case "rank": return rank;
                 default: throw new IllegalArgumentException("未知玩家数据字段: " + field);
             }
@@ -647,7 +688,7 @@ public class DataStorageManager {
                 hunterWins += persisted.hunterWins;
                 escapeWins += persisted.escapeWins;
                 totalWins = hunterWins + escapeWins;
-                proficiency += persisted.proficiency;
+                proficiency = normalizeProficiency(proficiency + persisted.proficiency);
                 if (name.isEmpty()) name = persisted.name;
                 if (rank.isEmpty()) rank = persisted.rank;
                 return this;

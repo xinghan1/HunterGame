@@ -507,21 +507,46 @@ public class StartGame implements Listener {
             plugin.setPvpLocked(false);
         });
 
-        Bukkit.broadcastMessage(plugin.getMessage("vanilla_hunter_started", "&7===== 经典猎人 已启动 ====="));
+        broadcastVanillaHunterStartBanner();
+    }
 
-        // 根据战役类型广播不同的目标
-        if (plugin.isPersistenceBattle()) {
-            int minutes = plugin.getConfig().getInt("game.persistence_modes.vanilla_hunter_minutes", 30);
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_mode_title", "&e【生存战模式】"));
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_escaper_objective", "&7• 逃生者目标：存活 %minutes% 分钟 或 击杀末影龙 •")
-                    .replace("%minutes%", String.valueOf(minutes)));
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_persistence_hunter_objective", "&7• 猎人目标：击杀全部逃生者 •"));
-        } else {
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_mode_title", "&c【通关战模式】"));
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_escaper_objective", "&7• 逃生者目标：击杀末影龙 •"));
-            Bukkit.broadcastMessage(plugin.getMessage("vanilla_clearance_hunter_objective", "&7• 猎人目标：击杀全部逃生者 •"));
+    private void broadcastVanillaHunterStartBanner() {
+        boolean persistence = plugin.isPersistenceBattle();
+        int minutes = plugin.getConfig().getInt("game.persistence_modes.vanilla_hunter_minutes", 30);
+        String messageKey = persistence
+                ? "vanilla_hunter_start_banner.persistence"
+                : "vanilla_hunter_start_banner.clearance";
+
+        List<String> defaultLines = persistence
+                ? List.of(
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+                        "&f               &f&l经典猎人",
+                        "&f",
+                        "&f               &e&l生存战模式",
+                        "&f    &b&l逃生者目标：&e&l存活 %minutes% 分钟或击杀末影龙",
+                        "&f    &c&l猎人目标：&e&l击杀全部逃生者",
+                        "&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人",
+                        "&f",
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+                )
+                : List.of(
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+                        "&f               &f&l经典猎人",
+                        "&f",
+                        "&f               &c&l通关战模式",
+                        "&f    &b&l逃生者目标：&e&l击杀末影龙",
+                        "&f    &c&l猎人目标：&e&l击杀全部逃生者",
+                        "&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人",
+                        "&f",
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+                );
+
+        for (String line : plugin.getMessageList(messageKey, defaultLines)) {
+            Bukkit.broadcastMessage(line
+                    .replace("%minutes%", String.valueOf(minutes))
+                    .replace("%escapers%", String.valueOf(plugin.getEscapers().size()))
+                    .replace("%hunters%", String.valueOf(plugin.getHunters().size())));
         }
-        broadcastTeamRatio();
     }
 
     private Location normalizeVanillaHunterSpawnLocation(World world, Location spawnLocation) {

@@ -34,10 +34,10 @@ set_lobby: |-
 
 welcome_message: "&a欢迎来到猎人游戏！"
 lobby_not_set: "&c大厅位置未正确设置，请联系管理员！"
-player_join: "&a&l[+] &f%player% (&e%online%&a/%max%)"
-player_join_start: "&a&l[+] &e%player%"
-player_quit: "&c&l[-] &e%player% (&e%online%&c/%max%)"
-player_quit_start: "&c&l[-] &e%player%"
+player_join: "&a[+] &f%player% &f(&e%online%&a/%max%&f)"
+player_join_start: "&a[+] &e%player%"
+player_quit: "&c[-] &e%player% &f(&e%online%&c/%max%&f)"
+player_quit_start: "&c[-] &e%player%"
 end_portal_activated: "&5末地传送门已激活！ &f坐标: &e%coordinates%"
 login_resetting_kick: "&c服务器正在重置中，请稍后再加入！"
 login_server_closing_kick: "&c游戏已结束，正在准备重置！"
@@ -58,13 +58,27 @@ game_progress: "&c游戏已经在进行中，不能重复启动！"
 no_world: "&c游戏世界未找到，无法开始游戏！"
 players_count: "&c猎人数量: %hunters% &8&l| &b逃生者数量: %escapers%"
 team_ratio: "&7• 阵营：%escapers%名逃生者 vs %hunters%名猎人 •"
-vanilla_hunter_started: "&7===== 经典猎人 已启动 ====="
-vanilla_persistence_mode_title: "&e【生存战模式】"
-vanilla_persistence_escaper_objective: "&7• 逃生者目标：存活 %minutes% 分钟 或 击杀末影龙 •"
-vanilla_persistence_hunter_objective: "&7• 猎人目标：击杀全部逃生者 •"
-vanilla_clearance_mode_title: "&c【通关战模式】"
-vanilla_clearance_escaper_objective: "&7• 逃生者目标：击杀末影龙 •"
-vanilla_clearance_hunter_objective: "&7• 猎人目标：击杀全部逃生者 •"
+vanilla_hunter_start_banner:
+  persistence:
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+    - '&f               &f&l经典猎人'
+    - '&f'
+    - '&f               &e&l生存战模式'
+    - '&f    &b&l逃生者目标：&e&l存活 %minutes% 分钟或击杀末影龙'
+    - '&f    &c&l猎人目标：&e&l击杀全部逃生者'
+    - '&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人'
+    - '&f'
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+  clearance:
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+    - '&f               &f&l经典猎人'
+    - '&f'
+    - '&f               &c&l通关战模式'
+    - '&f    &b&l逃生者目标：&e&l击杀末影龙'
+    - '&f    &c&l猎人目标：&e&l击杀全部逃生者'
+    - '&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人'
+    - '&f'
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
 hunter_title: "&a你是 &c猎人！"
 hunter_identity: "&a你是 &c猎人！"
 escaper_title: "&a你是 &b逃生者！"
@@ -111,14 +125,27 @@ clearance_hunter_victory_title: "&a时间耗尽"
 clearance_hunter_victory_subtitle: "&f你成功守住了胜利"
 
 final_battle_end_world_failed: "&c末地世界加载失败！"
-final_battle_started: "&a===== 终章之战 已启动 ====="
-final_battle_persistence_mode_title: "&e【生存战模式】"
-final_battle_persistence_escaper_objective: "&7• 逃生者目标：存活 %minutes% 分钟 •"
-final_battle_persistence_hunter_objective: "&7• 猎人目标：阻止逃生者，歼灭战 •"
-final_battle_clearance_mode_title: "&c【通关战模式】"
-final_battle_clearance_escaper_objective: "&7• 逃生者目标：击杀末影龙 •"
-final_battle_clearance_hunter_objective: "&7• 猎人目标：阻止逃生者，歼灭战 •"
-final_battle_team_ratio: "&7• 阵营： %escapers%名逃生者 vs %hunters%名猎人 •"
+final_battle_start_banner:
+  persistence:
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+    - '&f               &f&l终章之战'
+    - '&f'
+    - '&f               &e&l生存战模式'
+    - '&f    &b&l逃生者目标：&e&l存活 %minutes% 分钟'
+    - '&f    &c&l猎人目标：&e&l阻止逃生者并将其全部歼灭'
+    - '&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人'
+    - '&f'
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+  clearance:
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
+    - '&f               &f&l终章之战'
+    - '&f'
+    - '&f               &c&l通关战模式'
+    - '&f    &b&l逃生者目标：&e&l击杀末影龙'
+    - '&f    &c&l猎人目标：&e&l阻止逃生者并将其全部歼灭'
+    - '&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人'
+    - '&f'
+    - '&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬'
 final_battle_cage_start_title: "&a游戏已开始！"
 final_battle_cage_start_subtitle: ""
 final_battle_cage_countdown_title: "&e请注意当前环境是否安全"

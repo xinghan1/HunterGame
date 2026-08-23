@@ -14,6 +14,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -27,7 +28,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class FinalBattleManager implements Listener {
-    private static final double VANILLA_ENDER_DRAGON_HEALTH = 200.0;
+    private static final double FINAL_BATTLE_ENDER_DRAGON_HEALTH = 300.0;
 
     private final HunterGame plugin;
     private final Map<UUID, Integer> playerVotes;
@@ -74,24 +75,7 @@ public class FinalBattleManager implements Listener {
         restoreExistingDragonHealth(endWorld);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Bukkit.broadcastMessage(plugin.getMessage("final_battle_started", "&a===== 终章之战 已启动 ====="));
-
-            if (plugin.isPersistenceBattle()) {
-                int minutes = plugin.getConfig().getInt("game.persistence_modes.final_battle_minutes", 15);
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_mode_title", "&e【生存战模式】"));
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_escaper_objective", "&7• 逃生者目标：存活 %minutes% 分钟 •")
-                        .replace("%minutes%", String.valueOf(minutes)));
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_persistence_hunter_objective", "&7• 猎人目标：阻止逃生者，歼灭战 •"));
-            } else {
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_mode_title", "&c【通关战模式】"));
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_escaper_objective", "&7• 逃生者目标：击杀末影龙 •"));
-                Bukkit.broadcastMessage(plugin.getMessage("final_battle_clearance_hunter_objective", "&7• 猎人目标：阻止逃生者，歼灭战 •"));
-            }
-
-
-            Bukkit.broadcastMessage(plugin.getMessage("final_battle_team_ratio", "&7• 阵营： %escapers%名逃生者 vs %hunters%名猎人 •")
-                    .replace("%escapers%", String.valueOf(finalBattleEscapers.size()))
-                    .replace("%hunters%", String.valueOf(hunters.size())));
+            broadcastFinalBattleStartBanner();
 
             for (Player hunter : plugin.getHunters()) {
                 hunter.sendMessage(plugin.getMessage("hunter_identity", "&a你是 &c猎人！"));
@@ -106,17 +90,70 @@ public class FinalBattleManager implements Listener {
         }
     }
 
+    private void broadcastFinalBattleStartBanner() {
+        boolean persistence = plugin.isPersistenceBattle();
+        int minutes = plugin.getConfig().getInt("game.persistence_modes.final_battle_minutes", 15);
+        String messageKey = persistence
+                ? "final_battle_start_banner.persistence"
+                : "final_battle_start_banner.clearance";
+
+        List<String> defaultLines = persistence
+                ? List.of(
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+                        "&f               &f&l终章之战",
+                        "&f",
+                        "&f               &e&l生存战模式",
+                        "&f    &b&l逃生者目标：&e&l存活 %minutes% 分钟",
+                        "&f    &c&l猎人目标：&e&l阻止逃生者并将其全部歼灭",
+                        "&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人",
+                        "&f",
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+                )
+                : List.of(
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+                        "&f               &f&l终章之战",
+                        "&f",
+                        "&f               &c&l通关战模式",
+                        "&f    &b&l逃生者目标：&e&l击杀末影龙",
+                        "&f    &c&l猎人目标：&e&l阻止逃生者并将其全部歼灭",
+                        "&f    &7阵营：&b%escapers%名逃生者 &8vs &c%hunters%名猎人",
+                        "&f",
+                        "&a▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+                );
+
+        for (String line : plugin.getMessageList(messageKey, defaultLines)) {
+            Bukkit.broadcastMessage(line
+                    .replace("%minutes%", String.valueOf(minutes))
+                    .replace("%escapers%", String.valueOf(finalBattleEscapers.size()))
+                    .replace("%hunters%", String.valueOf(hunters.size())));
+        }
+    }
+
     private void restoreExistingDragonHealth(World world) {
         for (Entity entity : world.getEntities()) {
             if (entity instanceof EnderDragon dragon) {
-                AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
-                if (maxHealthAttribute != null) {
-                    maxHealthAttribute.setBaseValue(VANILLA_ENDER_DRAGON_HEALTH);
-                    dragon.setHealth(VANILLA_ENDER_DRAGON_HEALTH);
-                }
+                applyFinalBattleDragonHealth(dragon);
                 break;
             }
         }
+    }
+
+    @EventHandler
+    public void onEnderDragonSpawn(EntitySpawnEvent event) {
+        if (!gameActive || !plugin.isGameRunning() || !plugin.isFinalBattleMode()
+                || !(event.getEntity() instanceof EnderDragon dragon)) {
+            return;
+        }
+        applyFinalBattleDragonHealth(dragon);
+    }
+
+    private void applyFinalBattleDragonHealth(EnderDragon dragon) {
+        AttributeInstance maxHealthAttribute = dragon.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (maxHealthAttribute == null) {
+            return;
+        }
+        maxHealthAttribute.setBaseValue(FINAL_BATTLE_ENDER_DRAGON_HEALTH);
+        dragon.setHealth(FINAL_BATTLE_ENDER_DRAGON_HEALTH);
     }
 
     // 为所有玩家创建屏障

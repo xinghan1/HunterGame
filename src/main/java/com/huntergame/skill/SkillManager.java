@@ -327,7 +327,8 @@ public class SkillManager implements Listener {
 
         Player player = event.getPlayer();
         String skillName = getSelectedSkill(player);
-        if (!"突进".equals(skillName) && !player.isSneaking()) {
+        if (!"突进".equals(skillName)
+                && !"腾空".equals(skillName) && !player.isSneaking()) {
             return;
         }
         HunterSkill skill = getEnabledSkill(skillName);
@@ -630,11 +631,19 @@ public class SkillManager implements Listener {
 
         ConfigurationSection section = getSkillSection(skillName);
         String text = section == null ? fallback : section.getString("bossbar." + state, fallback);
-        String trigger = "突进".equals(skillName)
-                ? "手持长矛+右键"
-                : "蹲下+手持工具+右键";
+        String trigger;
+        if ("突进".equals(skillName)) {
+            trigger = "手持长矛+右键";
+        } else if ("腾空".equals(skillName)) {
+            trigger = "手持重锤+右键";
+        } else {
+            trigger = "蹲下+手持工具+右键";
+        }
         if ("突进".equals(skillName)) {
             text = text.replace("蹲下+手持长矛+右键", trigger)
+                    .replace("蹲下+手持工具+右键", trigger);
+        } else if ("腾空".equals(skillName)) {
+            text = text.replace("蹲下+手持重锤+右键", trigger)
                     .replace("蹲下+手持工具+右键", trigger);
         } else if (text.contains("右键")) {
             text = text.replace("触发方式: 手持", "触发方式: 蹲下+手持");

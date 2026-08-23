@@ -1058,7 +1058,7 @@ public class FinalBattleProfessionManager implements Listener {
             if (line.contains("向正前方闪现30格")) {
                 lore.set(
                         i,
-                        "&7蹲下+手持重锤+右键，向上腾空约12格，冷却12秒"
+                        "&7手持重锤+右键，向上腾空约12格，冷却12秒"
                 );
             }
         }

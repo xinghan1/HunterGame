@@ -201,13 +201,13 @@ skills:
       haste_amplifier: 2              # 急迫等级，2=急迫 III
       frozen_resistance_amplifier: 4 # 被定身者获得的抗性等级，防止定身期间被秒杀
 
-  # 蹲下手持重锤右键，向上腾空约 12 格。
+  # 手持重锤右键，向上腾空约 12 格。
   腾空:
     enabled: true
     bossbar:
-      ready: "&a技能: %skill% (就绪) 触发方式: 蹲下+手持重锤+右键"
-      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 蹲下+手持重锤+右键"
-      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 蹲下+手持重锤+右键"
+      ready: "&a技能: %skill% (就绪) 触发方式: 手持重锤+右键"
+      duration: "&b技能: %skill% (持续中: %seconds%秒) 触发方式: 手持重锤+右键"
+      cooldown: "&c技能: %skill% (冷却中: %seconds%秒) 触发方式: 手持重锤+右键"
     cooldown: 12
     duration: 0
     parameters:
